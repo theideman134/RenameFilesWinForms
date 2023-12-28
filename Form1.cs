@@ -28,7 +28,7 @@ namespace RenameFilesWinForms
                 FileInfo fileInfo = new FileInfo(file);
                 if (fileInfo.Exists && fileInfo.Extension != null)
                 {
-                    if(fileInfo.Extension.ToLower() == ".jpg" || fileInfo.Extension.ToLower() == ".mov" || fileInfo.Extension.ToLower() == ".mpg" || fileInfo.Extension.ToLower() == ".mp4" || fileInfo.Extension.ToLower() == ".png")
+                    if(fileInfo.Extension.ToLower() == ".jpg" || fileInfo.Extension.ToLower() == ".jpeg" || fileInfo.Extension.ToLower() == ".mov" || fileInfo.Extension.ToLower() == ".mpg" || fileInfo.Extension.ToLower() == ".mp4" || fileInfo.Extension.ToLower() == ".png")
                     {
                         
 
@@ -84,7 +84,7 @@ namespace RenameFilesWinForms
         {
             string newFileName = fileName;
             
-            if (fileInfo.Extension.ToLower() == ".jpg")
+            if (fileInfo.Extension.ToLower() == ".jpg" || fileInfo.Extension.ToLower() == ".jpeg")
             {
                 newFileName = newFileName + ".jpg";
             }
@@ -110,7 +110,7 @@ namespace RenameFilesWinForms
         static DateTime GetDateTaken(string filePath)
         {
 
-            if (filePath.ToLower().EndsWith(".jpg") || filePath.ToLower().EndsWith(".png"))
+            if (filePath.ToLower().EndsWith(".jpg") || filePath.ToLower().EndsWith(".jpeg") || filePath.ToLower().EndsWith(".png"))
             {
                 using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
                 {
