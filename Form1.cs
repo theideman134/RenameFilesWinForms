@@ -26,9 +26,9 @@ namespace RenameFilesWinForms
             {
 
                 FileInfo fileInfo = new FileInfo(file);
-                if (fileInfo.Exists)
+                if (fileInfo.Exists && fileInfo.Extension != null)
                 {
-                    if(fileInfo.Extension == ".jpg" || fileInfo.Extension == ".mov" || fileInfo.Extension == ".mpg" || fileInfo.Extension == ".mp4" || fileInfo.Extension == ".png")
+                    if(fileInfo.Extension.ToLower() == ".jpg" || fileInfo.Extension.ToLower() == ".mov" || fileInfo.Extension.ToLower() == ".mpg" || fileInfo.Extension.ToLower() == ".mp4" || fileInfo.Extension.ToLower() == ".png")
                     {
                         
 
@@ -84,23 +84,23 @@ namespace RenameFilesWinForms
         {
             string newFileName = fileName;
             
-            if (fileInfo.Extension == ".jpg")
+            if (fileInfo.Extension.ToLower() == ".jpg")
             {
                 newFileName = newFileName + ".jpg";
             }
-            if (fileInfo.Extension == ".mov")
+            if (fileInfo.Extension.ToLower() == ".mov")
             {
-                newFileName = newFileName + ".mov";
+                newFileName = newFileName + ".MOV";
             }
-            if (fileInfo.Extension == ".mpg")
+            if (fileInfo.Extension.ToLower() == ".mpg")
             {
                 newFileName = newFileName + ".mpg";
             }
-            if (fileInfo.Extension == ".mp4")
+            if (fileInfo.Extension.ToLower() == ".mp4")
             {
                 newFileName = newFileName + ".mp4";
             }
-            if (fileInfo.Extension == ".png")
+            if (fileInfo.Extension.ToLower() == ".png")
             {
                 newFileName = newFileName + ".png";
             }
@@ -109,23 +109,26 @@ namespace RenameFilesWinForms
 
         static DateTime GetDateTaken(string filePath)
         {
-            using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-            {
-                using (Image image = Image.FromStream(fs, false, false))
-                {
-                    foreach (PropertyItem propItem in image.PropertyItems)
-                    {
-                        if (propItem.Id == 0x9003) // PropertyTag DateTime
-                        {
-                            string dateTakenStr = Encoding.UTF8.GetString(propItem.Value);
-                            dateTakenStr = dateTakenStr.Replace("\0", "");
 
-                            return DateTime.ParseExact(dateTakenStr, "yyyy:MM:dd HH:mm:ss", null);
+            if (filePath.ToLower().EndsWith(".jpg") || filePath.ToLower().EndsWith(".png"))
+            {
+                using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                {
+                    using (Image image = Image.FromStream(fs, false, false))
+                    {
+                        foreach (PropertyItem propItem in image.PropertyItems)
+                        {
+                            if (propItem.Id == 0x9003) // PropertyTag DateTime
+                            {
+                                string dateTakenStr = Encoding.UTF8.GetString(propItem.Value);
+                                dateTakenStr = dateTakenStr.Replace("\0", "");
+
+                                return DateTime.ParseExact(dateTakenStr, "yyyy:MM:dd HH:mm:ss", null);
+                            }
                         }
                     }
                 }
             }
-
             // If date taken information is not found, return the last write time
             return File.GetLastWriteTime(filePath);
         }
