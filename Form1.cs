@@ -28,18 +28,33 @@ namespace RenameFilesWinForms
 
             string[] fileNames = System.IO.Directory.GetFiles(dirText.Text);
 
-            // --- MASTER TIME OFFSETS ---
-            int offsetYears = Convert.ToInt32(txtYear.Text);
-            int offsetMonths = Convert.ToInt32(txtMonth.Text);
-            int offsetDays = Convert.ToInt32(txtDay.Text);
-            int offsetHours = Convert.ToInt32(txtHour.Text);
-            int offsetMinutes = Convert.ToInt32(txtMins.Text);
-            int offsetSeconds = Convert.ToInt32(txtSecs.Text);
-            // ---------------------------
+            int offsetYears = 0;
+            int offsetMonths = 0;
+            int offsetDays = 0;
+            int offsetHours = 0;
+            int offsetMinutes = 0;
+            int offsetSeconds = 0;
+
+            try
+            {
+                // --- MASTER TIME OFFSETS ---
+                offsetYears = Convert.ToInt32(txtYear.Text);
+                offsetMonths = Convert.ToInt32(txtMonth.Text);
+                offsetDays = Convert.ToInt32(txtDay.Text);
+                offsetHours = Convert.ToInt32(txtHour.Text);
+                offsetMinutes = Convert.ToInt32(txtMins.Text);
+                offsetSeconds = Convert.ToInt32(txtSecs.Text);
+                // ---------------------------
+            }
+            catch 
+            {
+                MessageBox.Show("Please enter a valid offset time value.");
+                return;
+            }
 
             foreach (string file in fileNames)
             {
-                string[] validExtensions = { ".jpg", ".jpeg", ".mpg", ".mp4", ".mts", ".png", ".avi", ".heic" };
+                string[] validExtensions = { ".jpg", ".jpeg", ".png", ".heic",".mpg", ".mp4", ".mts", ".avi" };
                 FileInfo fileInfo = new FileInfo(file);
 
                 if (fileInfo.Exists && validExtensions.Contains(fileInfo.Extension.ToLower()))
@@ -48,7 +63,7 @@ namespace RenameFilesWinForms
                     DateTime originalFileDate = GetDateTaken(fileInfo.FullName, out bool hasMetadata);
                     DateTime mediaDate;
 
-                    if (dtChange.Value.Date != DateTime.Today)
+                    if (chkChangeDate.Checked)
                     {
                         // Override Date, keep Time
                         mediaDate = new DateTime(
@@ -134,13 +149,23 @@ namespace RenameFilesWinForms
         private void CleanScreen()
         {
             dirText.Text = "";
+            dirText.Update();
             txtYear.Text = "0";
+            txtYear.Update();
             txtMonth.Text = "0";
+            txtMonth.Update();
             txtDay.Text = "0";
+            txtDay.Update();
             txtHour.Text = "0";
+            txtHour.Update();
             txtMins.Text = "0";
+            txtMins.Update();               
             txtSecs.Text = "0";
+            txtSecs.Update();
             dtChange.Value = DateTime.Today;
+            dtChange.Update();
+            chkChangeDate.Checked = false;
+            chkChangeDate.Update();
         }
 
 

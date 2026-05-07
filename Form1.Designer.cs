@@ -44,6 +44,7 @@
             label5 = new Label();
             label6 = new Label();
             label7 = new Label();
+            chkChangeDate = new CheckBox();
             SuspendLayout();
             // 
             // dirText
@@ -181,11 +182,22 @@
             label7.TabIndex = 15;
             label7.Text = "Year";
             // 
+            // chkChangeDate
+            // 
+            chkChangeDate.AutoSize = true;
+            chkChangeDate.Location = new Point(456, 193);
+            chkChangeDate.Name = "chkChangeDate";
+            chkChangeDate.Size = new Size(72, 19);
+            chkChangeDate.TabIndex = 16;
+            chkChangeDate.Text = "Use Date";
+            chkChangeDate.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(691, 586);
+            Controls.Add(chkChangeDate);
             Controls.Add(label7);
             Controls.Add(label6);
             Controls.Add(label5);
@@ -226,5 +238,6 @@
         private Label label5;
         private Label label6;
         private Label label7;
+        private CheckBox chkChangeDate;
     }
 }
