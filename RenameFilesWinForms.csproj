@@ -2,10 +2,22 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows7.0</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="BenchmarkSuite1\**" />
+    <EmbeddedResource Remove="BenchmarkSuite1\**" />
+    <None Remove="BenchmarkSuite1\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ExifLibrary" Version="1.0.13" />
+    <PackageReference Include="MetadataExtractor" Version="2.9.3" />
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+  </ItemGroup>
 
 </Project>
