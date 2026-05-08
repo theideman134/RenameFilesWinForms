@@ -17,6 +17,7 @@ namespace RenameFilesWinForms
         {
             InitializeComponent();
         }
+        // E:\exiftool\exiftool.exe -time:all -G1 -a -s "C:\Path\To\Your\ProcessedFile.mp4"
 
         private void StartBtn_Click(object sender, EventArgs e)
         {
@@ -35,6 +36,8 @@ namespace RenameFilesWinForms
             int offsetMinutes = 0;
             int offsetSeconds = 0;
 
+            bool isTrueUTC = chkIsUTC.Checked; // If checked, we treat original metadata as true UTC and convert to local before applying offsets  
+
             try
             {
                 // --- MASTER TIME OFFSETS ---
@@ -46,7 +49,7 @@ namespace RenameFilesWinForms
                 offsetSeconds = Convert.ToInt32(txtSecs.Text);
                 // ---------------------------
             }
-            catch 
+            catch
             {
                 MessageBox.Show("Please enter a valid offset time value.");
                 return;
@@ -54,13 +57,13 @@ namespace RenameFilesWinForms
 
             foreach (string file in fileNames)
             {
-                string[] validExtensions = { ".jpg", ".jpeg", ".png", ".heic",".mpg", ".mp4", ".mts", ".avi" };
+                string[] validExtensions = { ".jpg", ".jpeg", ".png", ".heic", ".mpg", ".mp4", ".mts", ".avi" };
                 FileInfo fileInfo = new FileInfo(file);
 
                 if (fileInfo.Exists && validExtensions.Contains(fileInfo.Extension.ToLower()))
                 {
                     // 1. Extract raw date and check if actual metadata existed
-                    DateTime originalFileDate = GetDateTaken(fileInfo.FullName, out bool hasMetadata);
+                    DateTime originalFileDate = GetDateTaken(fileInfo.FullName,isTrueUTC, out bool hasMetadata);
                     DateTime mediaDate;
 
                     if (chkChangeDate.Checked)
@@ -81,7 +84,7 @@ namespace RenameFilesWinForms
                     }
 
                     // 2. Apply offsets
-                    DateTime correctedTime = AdjustMediaTime(mediaDate,offsetYears,offsetMonths, offsetDays, offsetHours, offsetMinutes,offsetSeconds);
+                    DateTime correctedTime = AdjustMediaTime(mediaDate, offsetYears, offsetMonths, offsetDays, offsetHours, offsetMinutes, offsetSeconds);
 
                     // 3. Setup renaming
                     string newName = correctedTime.ToString("yyyyMMdd_HHmmss");
@@ -115,23 +118,65 @@ namespace RenameFilesWinForms
 
                         if (needsMetadataWrite)
                         {
-                            string exifDate = correctedTime.ToString("yyyy:MM:dd HH:mm:ss");
+                            string extension2 = Path.GetExtension(finalPath).ToLower();
                             string backupDateString = originalFileDate.ToString("yyyy:MM:dd HH:mm:ss");
 
-                            // -AllDates updates DateTimeOriginal, CreateDate, and ModifyDate.
-                            // -UserComment stores our safe backup string.
-                            string exifArgs = $"-AllDates=\"{exifDate}\" -UserComment=\"OriginalDateBackup: {backupDateString}\" -overwrite_original \"{finalPath}\"";
+                            // Calculate your specific time variables
+                            string offsetStr = correctedTime.ToString("%K"); // e.g., -05:00
+                            string offsetShort = correctedTime.ToString("zzz"); // Timezone offset for AndroidTimeZone
+                            DateTime utcTime = correctedTime.ToUniversalTime();
 
+                            string exifArgs;
+
+
+                            /* exifArgs = $"-QuickTime:CreateDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                       $"-QuickTime:ModifyDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                       $"-Keys:CreationDate=\"{correctedTime:yyyy:MM:dd HH:mm:ss}{offsetStr}\" " +
+                                       $"-Keys:AndroidTimeZone=\"{offsetShort}\" " +
+                                       $"-Title=\"Archived Video - {backupDateString:yyyy}\" " +
+                                       $"-Description=\"OriginalDateBackup: {backupDateString}. Local Time: {correctedTime:t}\" " +
+                                       $"-P -overwrite_original \"{finalPath}\"";
+                        */
+
+                            if (extension2 == ".mp4" || extension2 == ".mov")
+                            {
+                                // Your specific MP4 logic
+                                exifArgs = $"-QuickTime:CreateDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                                   $"-QuickTime:ModifyDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                                   $"-TrackCreateDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                                   $"-TrackModifyDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                                   $"-MediaCreateDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                                   $"-MediaModifyDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                                   $"-XMP-exif:DateTimeOriginal=\"{correctedTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                                   $"-XMP-xmp:CreateDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                                   $"-XMP-xmp:ModifyDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
+                                                   $"-Keys:CreationDate=\"{correctedTime:yyyy:MM:dd HH:mm:ss}{offsetStr}\" " +
+                                                   $"-Keys:AndroidTimeZone=\"{offsetShort}\" " +
+                                                   $"-Title=\"Archived Video - {correctedTime:yyyy}\" " +
+                                                   $"-Description=\"Original: {backupDateString}. Local Chicago Time: {correctedTime:t}\" " +
+                                                   $"-P -overwrite_original \"{finalPath}\"";
+                            }
+                            else
+                            {
+                                // Standard Image logic
+                                string exifDate = correctedTime.ToString("yyyy:MM:dd HH:mm:ss");
+                                exifArgs = $"-AllDates=\"{exifDate}\" -UserComment=\"OriginalDateBackup: {backupDateString}\" " +
+                                           $"-overwrite_original \"{finalPath}\"";
+                            }
+
+                            // Execute ExifTool
                             ProcessStartInfo exifInfo = new ProcessStartInfo
                             {
-                                FileName = @"E:\exiftool\exiftool.exe", // Update to your path
+                                FileName = @"E:\exiftool\exiftool.exe",
                                 Arguments = exifArgs,
                                 CreateNoWindow = true,
                                 UseShellExecute = false
                             };
+
                             using (Process p = Process.Start(exifInfo)) { p.WaitForExit(); }
 
-                            // Sync Windows File System dates
+                            // Final Sync for Windows File Explorer
+                            // Note: If you used -P in exifArgs, these calls are what finalize the system dates
                             File.SetCreationTime(finalPath, correctedTime);
                             File.SetLastWriteTime(finalPath, correctedTime);
                         }
@@ -159,7 +204,7 @@ namespace RenameFilesWinForms
             txtHour.Text = "0";
             txtHour.Update();
             txtMins.Text = "0";
-            txtMins.Update();               
+            txtMins.Update();
             txtSecs.Text = "0";
             txtSecs.Update();
             dtChange.Value = DateTime.Today;
@@ -169,7 +214,7 @@ namespace RenameFilesWinForms
         }
 
 
-        private DateTime AdjustMediaTime(DateTime originalTime,int offsetYear,int offsetMonth,int offsetDays,int offsetHour,int offsetMinute,int offsetSeconds)
+        private DateTime AdjustMediaTime(DateTime originalTime, int offsetYear, int offsetMonth, int offsetDays, int offsetHour, int offsetMinute, int offsetSeconds)
         {
             return originalTime.AddYears(offsetYear).AddMonths(offsetMonth).AddDays(offsetDays).AddHours(offsetHour).AddMinutes(offsetMinute).AddSeconds(offsetSeconds);
         }
@@ -225,43 +270,59 @@ namespace RenameFilesWinForms
             return fileNameNoExt + normalizedExt;
         }
 
-        static DateTime GetDateTaken(string filePath, out bool hasMetadata)
+        static DateTime GetDateTaken(string filePath, bool isTrueUTC, out bool hasMetadata)
         {
-            hasMetadata = false; // Default to false
+            hasMetadata = false;
+            string fileName = Path.GetFileNameWithoutExtension(filePath);
+
+            // 1. Filename remains the Gold Standard for local time
+            if (DateTime.TryParseExact(fileName, "yyyyMMdd_HHmmss", null, System.Globalization.DateTimeStyles.AssumeLocal, out DateTime parsedDate))
+            {
+                hasMetadata = true;
+                return DateTime.SpecifyKind(parsedDate, DateTimeKind.Local);
+            }
+
             try
             {
                 var directories = ImageMetadataReader.ReadMetadata(filePath);
 
-                // --- PHOTO LOGIC (JPG, PNG, HEIC) ---
+                // --- NEW: CHECK ANDROID/APPLE KEYS FIRST ---
+                // These tags (Keys:CreationDate) usually contain the offset, making them bulletproof.
+                var keysDirectory = directories.OfType<QuickTimeMetadataHeaderDirectory>().FirstOrDefault();
+                if (keysDirectory != null && keysDirectory.TryGetDateTime(QuickTimeMetadataHeaderDirectory.TagCreationDate, out DateTime keysDate))
+                {
+                    hasMetadata = true;
+                    // If the key was read correctly, MetadataExtractor often handles the offset conversion.
+                    // We force it to Local to ensure your downstream offset math (15/20 hrs) is consistent.
+                    return keysDate.ToLocalTime();
+                }
+
+                // --- PHOTO LOGIC ---
                 var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
                 if (subIfdDirectory != null && subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out DateTime exifDate))
                 {
                     hasMetadata = true;
-                    return exifDate;
+                    return DateTime.SpecifyKind(exifDate, DateTimeKind.Local);
                 }
 
-                // --- VIDEO LOGIC (MOV, MP4) ---
+                // --- VIDEO LOGIC (Fallback for older files without 'Keys') ---
                 var movDirectory = directories.OfType<QuickTimeMovieHeaderDirectory>().FirstOrDefault();
                 if (movDirectory != null && movDirectory.TryGetDateTime(QuickTimeMovieHeaderDirectory.TagCreated, out DateTime movDate))
                 {
                     hasMetadata = true;
-                    return DateTime.SpecifyKind(movDate, DateTimeKind.Unspecified);
-                }
-
-                // --- AVI LOGIC ---
-                var aviDirectory = directories.OfType<AviDirectory>().FirstOrDefault();
-                if (aviDirectory != null && aviDirectory.TryGetDateTime(AviDirectory.TagDateTimeOriginal, out DateTime aviDate))
-                {
-                    hasMetadata = true;
-                    return DateTime.SpecifyKind(aviDate, DateTimeKind.Unspecified);
+                    // If we are here, we don't have an offset key, so we use your batch toggle
+                    return isTrueUTC ? DateTime.SpecifyKind(movDate, DateTimeKind.Utc).ToLocalTime()
+                                     : DateTime.SpecifyKind(movDate, DateTimeKind.Local);
                 }
             }
-            catch
-            {
-                // If metadata is corrupt, fall back to file system dates
-            }
+            catch { /* Metadata error */ }
 
             return File.GetLastWriteTime(filePath);
+        }
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }

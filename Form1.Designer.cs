@@ -45,6 +45,7 @@
             label6 = new Label();
             label7 = new Label();
             chkChangeDate = new CheckBox();
+            chkIsUTC = new CheckBox();
             SuspendLayout();
             // 
             // dirText
@@ -192,11 +193,23 @@
             chkChangeDate.Text = "Use Date";
             chkChangeDate.UseVisualStyleBackColor = true;
             // 
+            // chkIsUTC
+            // 
+            chkIsUTC.AutoSize = true;
+            chkIsUTC.Location = new Point(490, 148);
+            chkIsUTC.Name = "chkIsUTC";
+            chkIsUTC.Size = new Size(70, 19);
+            chkIsUTC.TabIndex = 17;
+            chkIsUTC.Text = "Use UTC";
+            chkIsUTC.UseVisualStyleBackColor = true;
+            chkIsUTC.CheckedChanged += checkBox1_CheckedChanged;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(691, 586);
+            Controls.Add(chkIsUTC);
             Controls.Add(chkChangeDate);
             Controls.Add(label7);
             Controls.Add(label6);
@@ -239,5 +252,6 @@
         private Label label6;
         private Label label7;
         private CheckBox chkChangeDate;
+        private CheckBox chkIsUTC;
     }
 }
