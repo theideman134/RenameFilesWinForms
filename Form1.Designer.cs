@@ -46,6 +46,18 @@
             label7 = new Label();
             chkChangeDate = new CheckBox();
             chkIsUTC = new CheckBox();
+            chkMP4only = new CheckBox();
+            chkForce = new CheckBox();
+            cboLocations = new ComboBox();
+            cboCamera = new ComboBox();
+            lblTitle = new Label();
+            txtTitle = new TextBox();
+            lblDesc = new Label();
+            txtDesc = new TextBox();
+            rdoCentral = new RadioButton();
+            rdoMountain = new RadioButton();
+            rdoPacific = new RadioButton();
+            rdoEastern = new RadioButton();
             SuspendLayout();
             // 
             // dirText
@@ -57,7 +69,7 @@
             // 
             // StartBtn
             // 
-            StartBtn.Location = new Point(224, 258);
+            StartBtn.Location = new Point(237, 498);
             StartBtn.Name = "StartBtn";
             StartBtn.Size = new Size(199, 76);
             StartBtn.TabIndex = 1;
@@ -204,11 +216,142 @@
             chkIsUTC.UseVisualStyleBackColor = true;
             chkIsUTC.CheckedChanged += checkBox1_CheckedChanged;
             // 
+            // chkMP4only
+            // 
+            chkMP4only.AutoSize = true;
+            chkMP4only.Location = new Point(574, 143);
+            chkMP4only.Name = "chkMP4only";
+            chkMP4only.Size = new Size(76, 19);
+            chkMP4only.TabIndex = 18;
+            chkMP4only.Text = "MP4 only";
+            chkMP4only.UseVisualStyleBackColor = true;
+            chkMP4only.CheckedChanged += checkBox1_CheckedChanged_1;
+            // 
+            // chkForce
+            // 
+            chkForce.AutoSize = true;
+            chkForce.Location = new Point(574, 177);
+            chkForce.Name = "chkForce";
+            chkForce.Size = new Size(96, 19);
+            chkForce.TabIndex = 19;
+            chkForce.Text = "Force Update";
+            chkForce.UseVisualStyleBackColor = true;
+            // 
+            // cboLocations
+            // 
+            cboLocations.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            cboLocations.AutoCompleteSource = AutoCompleteSource.ListItems;
+            cboLocations.FormattingEnabled = true;
+            cboLocations.Location = new Point(176, 419);
+            cboLocations.Name = "cboLocations";
+            cboLocations.Size = new Size(352, 23);
+            cboLocations.TabIndex = 28;
+            cboLocations.SelectedIndexChanged += cboLocations_SelectedIndexChanged;
+            // 
+            // cboCamera
+            // 
+            cboCamera.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            cboCamera.AutoCompleteSource = AutoCompleteSource.ListItems;
+            cboCamera.FormattingEnabled = true;
+            cboCamera.Location = new Point(176, 458);
+            cboCamera.Name = "cboCamera";
+            cboCamera.Size = new Size(352, 23);
+            cboCamera.TabIndex = 29;
+            // 
+            // lblTitle
+            // 
+            lblTitle.AutoSize = true;
+            lblTitle.Location = new Point(27, 243);
+            lblTitle.Name = "lblTitle";
+            lblTitle.Size = new Size(33, 15);
+            lblTitle.TabIndex = 31;
+            lblTitle.Text = "Title:";
+            // 
+            // txtTitle
+            // 
+            txtTitle.Location = new Point(76, 235);
+            txtTitle.Name = "txtTitle";
+            txtTitle.Size = new Size(541, 23);
+            txtTitle.TabIndex = 30;
+            // 
+            // lblDesc
+            // 
+            lblDesc.AutoSize = true;
+            lblDesc.Location = new Point(12, 286);
+            lblDesc.Name = "lblDesc";
+            lblDesc.Size = new Size(67, 15);
+            lblDesc.TabIndex = 33;
+            lblDesc.Text = "Description";
+            // 
+            // txtDesc
+            // 
+            txtDesc.Location = new Point(76, 283);
+            txtDesc.Multiline = true;
+            txtDesc.Name = "txtDesc";
+            txtDesc.Size = new Size(541, 120);
+            txtDesc.TabIndex = 32;
+            // 
+            // rdoCentral
+            // 
+            rdoCentral.AutoSize = true;
+            rdoCentral.Location = new Point(27, 133);
+            rdoCentral.Name = "rdoCentral";
+            rdoCentral.Size = new Size(63, 19);
+            rdoCentral.TabIndex = 34;
+            rdoCentral.TabStop = true;
+            rdoCentral.Text = "Central";
+            rdoCentral.UseVisualStyleBackColor = true;
+            // 
+            // rdoMountain
+            // 
+            rdoMountain.AutoSize = true;
+            rdoMountain.Location = new Point(27, 158);
+            rdoMountain.Name = "rdoMountain";
+            rdoMountain.Size = new Size(77, 19);
+            rdoMountain.TabIndex = 35;
+            rdoMountain.TabStop = true;
+            rdoMountain.Text = "Mountain";
+            rdoMountain.UseVisualStyleBackColor = true;
+            // 
+            // rdoPacific
+            // 
+            rdoPacific.AutoSize = true;
+            rdoPacific.Location = new Point(27, 183);
+            rdoPacific.Name = "rdoPacific";
+            rdoPacific.Size = new Size(60, 19);
+            rdoPacific.TabIndex = 36;
+            rdoPacific.TabStop = true;
+            rdoPacific.Text = "Pacific";
+            rdoPacific.UseVisualStyleBackColor = true;
+            // 
+            // rdoEastern
+            // 
+            rdoEastern.AutoSize = true;
+            rdoEastern.Location = new Point(27, 108);
+            rdoEastern.Name = "rdoEastern";
+            rdoEastern.Size = new Size(63, 19);
+            rdoEastern.TabIndex = 37;
+            rdoEastern.TabStop = true;
+            rdoEastern.Text = "Eastern";
+            rdoEastern.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(691, 586);
+            Controls.Add(rdoEastern);
+            Controls.Add(rdoPacific);
+            Controls.Add(rdoMountain);
+            Controls.Add(rdoCentral);
+            Controls.Add(lblDesc);
+            Controls.Add(txtDesc);
+            Controls.Add(lblTitle);
+            Controls.Add(txtTitle);
+            Controls.Add(cboCamera);
+            Controls.Add(cboLocations);
+            Controls.Add(chkForce);
+            Controls.Add(chkMP4only);
             Controls.Add(chkIsUTC);
             Controls.Add(chkChangeDate);
             Controls.Add(label7);
@@ -229,6 +372,7 @@
             Controls.Add(dirText);
             Name = "Form1";
             Text = "Rename Files";
+            Load += Form1_Load;
             ResumeLayout(false);
             PerformLayout();
         }
@@ -253,5 +397,18 @@
         private Label label7;
         private CheckBox chkChangeDate;
         private CheckBox chkIsUTC;
+        private CheckBox chkMP4only;
+        private CheckBox chkForce;
+        private ComboBox comboBox1;
+        private ComboBox cboLocations;
+        private ComboBox cboCamera;
+        private Label lblTitle;
+        private TextBox txtTitle;
+        private Label lblDesc;
+        private TextBox txtDesc;
+        private RadioButton rdoCentral;
+        private RadioButton rdoMountain;
+        private RadioButton rdoPacific;
+        private RadioButton rdoEastern;
     }
 }
