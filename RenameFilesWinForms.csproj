@@ -22,4 +22,9 @@
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\exiftool\Exiftools.csproj" />
+    <ProjectReference Include="..\PhotoDB\PhotoDB.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RenameFilesWinForms", "Rena
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhotoDB", "..\PhotoDB\PhotoDB.csproj", "{1A5C890B-3450-4C5C-9164-306E0BFC83FC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Exiftools", "..\exiftool\Exiftools.csproj", "{7E91FC76-C94D-4462-BA2F-510D5DF85896}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{1A5C890B-3450-4C5C-9164-306E0BFC83FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1A5C890B-3450-4C5C-9164-306E0BFC83FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1A5C890B-3450-4C5C-9164-306E0BFC83FC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E91FC76-C94D-4462-BA2F-510D5DF85896}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E91FC76-C94D-4462-BA2F-510D5DF85896}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E91FC76-C94D-4462-BA2F-510D5DF85896}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E91FC76-C94D-4462-BA2F-510D5DF85896}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

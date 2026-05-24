@@ -1,4 +1,5 @@
 using Dapper;
+using Exiftools;
 using MetadataExtractor;
 using MetadataExtractor.Formats.Avi;
 using MetadataExtractor.Formats.Exif;
@@ -15,12 +16,30 @@ namespace RenameFilesWinForms
 {
     public partial class Form1 : Form
     {
-        public Form1()
+        private readonly IExiftool _exiftool;
+
+        public Form1(IExiftool exiftool)
         {
             InitializeComponent();
+            _exiftool = exiftool;
             rdoCentral.Checked = true;
+
         }
         // E:\exiftool\exiftool.exe -make -model -time:all -G1 -a -s "C:\Path\To\Your\ProcessedFile.mp4"
+
+        private static readonly Dictionary<string, string> MakerMap = new Dictionary<string, string>
+    {
+        { "canon inc.", "Canon" },
+        { "canon", "Canon" },
+        { "nikon corp.", "Nikon" },
+        { "nikon corp", "Nikon" },
+        { "nikon", "Nikon" },
+        { "sony corp.", "Sony" },
+        { "sony corporation", "Sony" },
+        { "sony", "Sony" },
+        { "fujifilm co.", "Fujifilm" },
+        { "fujifilm", "Fujifilm" }
+    };
 
         private void StartBtn_Click(object sender, EventArgs e)
         {
@@ -83,6 +102,27 @@ namespace RenameFilesWinForms
                     // 1. Extract raw date and check if actual metadata existed
                     DateTime originalFileDate = GetDateTaken(fileInfo.FullName, isTrueUTC, out bool hasMetadata);
                     DateTime mediaDate;
+
+                    ExifModel tempExifModel = _exiftool.GetFileMetadata(fileInfo.FullName);
+ 
+                    if (tempExifModel != null)
+                    {
+                        make = tempExifModel.Make ?? "";
+                        if(make != "")
+                        {
+                            make = MakerFix(make);
+                        }
+                        model = tempExifModel.Model ?? "";                        
+                    }
+
+
+
+                    bool hasCamera;
+                    if(!string.IsNullOrEmpty(make) || !string.IsNullOrEmpty(model));
+                    {
+                        hasCamera = true;
+                    }
+                    bool hasGps = HasGpsMetadata(fileInfo.FullName);
 
                     if (chkChangeDate.Checked)
                     {
@@ -151,7 +191,20 @@ namespace RenameFilesWinForms
 
                             TimeSpan tzOffset = GetSelectedTimeZoneOffset(correctedTime);
 
-                            RunExifToolFinalSync(finalPath, originalFileDate, correctedTime, make, model, latitudeText, longitudeText, chkForce.Checked, tzOffset);
+                            ExifModel exifModel = new ExifModel();
+                            exifModel.FinalPath = finalPath;
+                            exifModel.OriginalFileDate = originalFileDate;
+                            exifModel.CorrectedTime = correctedTime;
+                            exifModel.Make = make;
+                            exifModel.Model = model;
+                            exifModel.LatitudeText = latitudeText;
+                            exifModel.LongitudeText = longitudeText;
+                            exifModel.ForceUpdate = chkForce.Checked;
+                            exifModel.TzOffset = tzOffset;
+                            exifModel.FileHasCamera = hasCamera;
+                            exifModel.FileHasGps = hasGps;
+
+                            _exiftool.RunExifToolFinalSync(exifModel);
                         }
                     }
                     catch (Exception ex)
@@ -298,99 +351,7 @@ namespace RenameFilesWinForms
 
         // 1. Update the signature to accept 'TimeSpan tzOffset' at the end
         // 1. Update the signature to accept 'TimeSpan tzOffset' at the end
-        private void RunExifToolFinalSync(string finalPath, DateTime originalFileDate, DateTime correctedTime, string make, string model, string latitudeText, string longitudeText, bool forceUpdate, TimeSpan tzOffset)
-        {
-            string extension2 = Path.GetExtension(finalPath).ToLower();
-            string backupDateString = originalFileDate.ToString("yyyy:MM:dd HH:mm:ss");
-
-            bool timeNeedsUpdate = (correctedTime != originalFileDate);
-            string exifArgs = "";
-            bool hasExtraMeta = false;
-
-            if (!string.IsNullOrEmpty(make) && !string.IsNullOrEmpty(model))
-            {
-                exifArgs += $"-Make=\"{make}\" -Model=\"{model}\" ";
-                hasExtraMeta = true;
-            }
-
-            if (!string.IsNullOrWhiteSpace(latitudeText) && !string.IsNullOrWhiteSpace(longitudeText))
-            {
-                string latRef = latitudeText.StartsWith("-") ? "S" : "N";
-                string lonRef = longitudeText.StartsWith("-") ? "W" : "E";
-                string latClean = latitudeText.Trim('-').Trim();
-                string lonClean = longitudeText.Trim('-').Trim();
-
-                exifArgs += $"-GPSLatitude=\"{latClean}\" -GPSLatitudeRef=\"{latRef}\" -GPSLongitude=\"{lonClean}\" -GPSLongitudeRef=\"{lonRef}\" ";
-                hasExtraMeta = true;
-            }
-
-            if (!forceUpdate && hasExtraMeta)
-            {
-                exifArgs = "-wm cg " + exifArgs;
-            }
-
-            if (timeNeedsUpdate)
-            {
-                // 2. REPLACED LOCAL TIMEZONE LOGIC WITH SELECTED RADIO BUTTON LOGIC
-                // Calculate the true UTC time based on the selected timezone offset
-                DateTime utcTime = DateTime.SpecifyKind(correctedTime - tzOffset, DateTimeKind.Utc);
-
-                // Format the offset as a string (e.g., "-05:00" or "+02:00")
-                string offsetStr = $"{(tzOffset < TimeSpan.Zero ? "-" : "+")}{tzOffset.ToString(@"hh\:mm")}";
-
-                if (extension2 == ".mp4" || extension2 == ".mov")
-                {
-                    exifArgs += $"-QuickTime:CreateDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
-                                $"-QuickTime:ModifyDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
-                                $"-TrackCreateDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
-                                $"-TrackModifyDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
-                                $"-MediaCreateDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
-                                $"-MediaModifyDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
-                                $"-XMP-exif:DateTimeOriginal=\"{correctedTime:yyyy:MM:dd HH:mm:ss}\" " +
-                                $"-XMP-xmp:CreateDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
-                                $"-XMP-xmp:ModifyDate=\"{utcTime:yyyy:MM:dd HH:mm:ss}\" " +
-                                $"-Keys:CreationDate=\"{correctedTime:yyyy:MM:dd HH:mm:ss}{offsetStr}\" " +
-                                $"-Keys:AndroidTimeZone=\"{offsetStr}\" "; // Replaced offsetShort with offsetStr
-                }
-                else
-                {
-                    string exifDate = correctedTime.ToString("yyyy:MM:dd HH:mm:ss");
-                    exifArgs += $"-AllDates=\"{exifDate}\" ";
-                }
-
-                exifArgs += $"-Title=\"Archived Video - {correctedTime:yyyy}\" " +
-                            $"-Description=\"Original: {backupDateString}. Local Time: {correctedTime:t}\" ";
-            }
-
-            if (!timeNeedsUpdate && !hasExtraMeta)
-            {
-                return;
-            }
-
-            exifArgs += $"-P -overwrite_original \"{finalPath}\"";
-
-            if (String.IsNullOrEmpty(exifArgs.Trim()))
-            {
-                return; // No metadata to write, so skip running ExifTool
-            }
-
-            ProcessStartInfo exifInfo = new ProcessStartInfo
-            {
-                FileName = @"E:\exiftool\exiftool.exe",
-                Arguments = exifArgs,
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-
-
-            using (Process p = Process.Start(exifInfo)) { p.WaitForExit(); }
-            
-            if (timeNeedsUpdate)
-            {
-                File.SetCreationTime(finalPath, correctedTime);
-                File.SetLastWriteTime(finalPath, correctedTime);
-            }
-        }
+    
 
         private string NewFileName(DateTime time)
         {
@@ -493,7 +454,16 @@ namespace RenameFilesWinForms
             }
         }
 
-        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        private string MakerFix(String currentMaker)
+        {
+            string lookupKey = currentMaker.ToLowerInvariant();
+            string standardName = String.Empty;
+            // 3. Check if it matches an inconsistent variation
+            MakerMap.TryGetValue(lookupKey, out standardName);
+
+            return standardName;
+        }
+private void checkBox1_CheckedChanged(object sender, EventArgs e)
         {
 
         }
