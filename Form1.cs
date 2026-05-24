@@ -5,11 +5,13 @@ using MetadataExtractor.Formats.Avi;
 using MetadataExtractor.Formats.Exif;
 using MetadataExtractor.Formats.QuickTime;
 using Microsoft.Data.SqlClient;
+using RenameFilesWinForms;
 using System;
 using System.Diagnostics;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
 using System.Windows.Forms;
 
 namespace RenameFilesWinForms
@@ -27,13 +29,18 @@ namespace RenameFilesWinForms
         }
         // E:\exiftool\exiftool.exe -make -model -time:all -G1 -a -s "C:\Path\To\Your\ProcessedFile.mp4"
 
+        // E:\exiftool\exiftool.exe -make -model -title -description -time:all -G1 -a -s "E:\picture3\2011-02-02 - Day after big storm - Copy\20110202_120246.jpg"
+
         private static readonly Dictionary<string, string> MakerMap = new Dictionary<string, string>
     {
+        { "apple", "Apple" },
+        { "apple inc.", "Apple" },
         { "canon inc.", "Canon" },
         { "canon", "Canon" },
         { "nikon corp.", "Nikon" },
         { "nikon corp", "Nikon" },
         { "nikon", "Nikon" },
+        { "samsung","Samsung" },
         { "sony corp.", "Sony" },
         { "sony corporation", "Sony" },
         { "sony", "Sony" },
@@ -41,6 +48,7 @@ namespace RenameFilesWinForms
         { "fujifilm", "Fujifilm" }
     };
 
+        
         private void StartBtn_Click(object sender, EventArgs e)
         {
             if (!System.IO.Directory.Exists(dirText.Text))
@@ -49,37 +57,34 @@ namespace RenameFilesWinForms
                 return;
             }
 
-            string[] fileNames = System.IO.Directory.GetFiles(dirText.Text);
+            RenameViewModel model = GetViewModel();
 
-            int offsetYears = 0;
-            int offsetMonths = 0;
-            int offsetDays = 0;
-            int offsetHours = 0;
-            int offsetMinutes = 0;
-            int offsetSeconds = 0;
+            string[] fileNames = System.IO.Directory.GetFiles(model.DirectoryPath);
+            
+            ProcessFiles(_exiftool, model, fileNames);
 
-            string make = "";
-            string model = "";
-            LocationPreset location = cboLocations.SelectedItem as LocationPreset;
-            string latitudeText = location?.Latitude.ToString() ?? "";
-            string longitudeText = location?.Longitude.ToString() ?? "";
+            CleanScreen();
+            MessageBox.Show("Processing Complete!");
+        }
 
-            bool isTrueUTC = chkIsUTC.Checked; // If checked, we treat original metadata as true UTC and convert to local before applying offsets  
+        private void ProcessFiles(IExiftool exiftool, RenameViewModel model, string[] fileNames)
+        {
+            string latitudeText = model.LocationPresets?.Latitude.ToString() ?? "";
+            string longitudeText = model.LocationPresets?.Longitude.ToString() ?? "";
 
-            try
+            // 1. DEFAULT BEHAVIOR: Attempt Auto-Detection first
+
+            // Scan the directory to find a file with valid camera metadata
+            ExifModel defaultCamera = GetCameraDefault(fileNames, _exiftool, model);
+
+            if (defaultCamera == null)
             {
-                // --- MASTER TIME OFFSETS ---
-                offsetYears = Convert.ToInt32(txtYear.Text);
-                offsetMonths = Convert.ToInt32(txtMonth.Text);
-                offsetDays = Convert.ToInt32(txtDay.Text);
-                offsetHours = Convert.ToInt32(txtHour.Text);
-                offsetMinutes = Convert.ToInt32(txtMins.Text);
-                offsetSeconds = Convert.ToInt32(txtSecs.Text);
-                // ---------------------------
-            }
-            catch
-            {
-                MessageBox.Show("Please enter a valid offset time value.");
+                MessageBox.Show(
+                      "Could not detect camera metadata automatically. Please manually select the camera profile from the dropdown.",
+                      "Camera Metadata Missing",
+                      MessageBoxButtons.OK,
+                      MessageBoxIcon.Warning
+                );
                 return;
             }
 
@@ -87,7 +92,7 @@ namespace RenameFilesWinForms
             {
                 string[] validExtensions = null;
 
-                if (chkMP4only.Checked)
+                if (model.MP4Only)
                 {
                     validExtensions = new string[] { ".mp4" };
                 }
@@ -95,36 +100,44 @@ namespace RenameFilesWinForms
                 {
                     validExtensions = new string[] { ".jpg", ".jpeg", ".png", ".heic", ".mpg", ".mp4", ".mts", ".avi" };
                 }
+
                 FileInfo fileInfo = new FileInfo(file);
 
                 if (fileInfo.Exists && validExtensions.Contains(fileInfo.Extension.ToLower()))
                 {
+
+                    ExifModel curretExifModel = exiftool.GetFileMetadata(fileInfo.FullName);
+
+                    // 1. Ensure we have a safe model instance right off the bat
+                    curretExifModel ??= new ExifModel();
+
+                    // 2. Resolve the Make string cleanly
+                    if (!string.IsNullOrWhiteSpace(curretExifModel.Make))
+                    {
+                        curretExifModel.Make = NormalizeMake(curretExifModel.Make);
+                    }
+                    else
+                    {
+                        curretExifModel.Make = defaultCamera.Make; // Pulled from your clean default baseline object!
+                    }
+
+                    // 3. Resolve the Model string cleanly (using the resolved Make)
+                    if (!string.IsNullOrWhiteSpace(curretExifModel.Model))
+                    {
+                        curretExifModel.Model = NormalizeModel(curretExifModel.Make, curretExifModel.Model);
+                    }
+                    else
+                    {
+                        curretExifModel.Model = defaultCamera.Model; // Pulled from your clean default baseline object!
+                    }
+
                     // 1. Extract raw date and check if actual metadata existed
-                    DateTime originalFileDate = GetDateTaken(fileInfo.FullName, isTrueUTC, out bool hasMetadata);
+                    DateTime originalFileDate = GetDateTaken(fileInfo.FullName, model.UseUTC, out bool hasMetadata);
                     DateTime mediaDate;
 
-                    ExifModel tempExifModel = _exiftool.GetFileMetadata(fileInfo.FullName);
- 
-                    if (tempExifModel != null)
-                    {
-                        make = tempExifModel.Make ?? "";
-                        if(make != "")
-                        {
-                            make = MakerFix(make);
-                        }
-                        model = tempExifModel.Model ?? "";                        
-                    }
+                    //          bool hasGps = HasGpsMetadata(fileInfo.FullName);
 
-
-
-                    bool hasCamera;
-                    if(!string.IsNullOrEmpty(make) || !string.IsNullOrEmpty(model));
-                    {
-                        hasCamera = true;
-                    }
-                    bool hasGps = HasGpsMetadata(fileInfo.FullName);
-
-                    if (chkChangeDate.Checked)
+                    if (model.UseDate)
                     {
                         // Override Date, keep Time
                         mediaDate = new DateTime(
@@ -142,7 +155,7 @@ namespace RenameFilesWinForms
                     }
 
                     // 2. Apply offsets
-                    DateTime correctedTime = AdjustMediaTime(mediaDate, offsetYears, offsetMonths, offsetDays, offsetHours, offsetMinutes, offsetSeconds);
+                    DateTime correctedTime = AdjustMediaTime(mediaDate,model);
 
                     // 3. Setup renaming
                     string newName = correctedTime.ToString("yyyyMMdd_HHmmss");
@@ -164,6 +177,7 @@ namespace RenameFilesWinForms
                             fileInfo.MoveTo(finalPath);
                         }
 
+                        /*
                         // Determine if we need to trigger ExifTool
                         bool needsMetadataWrite = !hasMetadata ||
                                                   offsetYears != 0 ||
@@ -179,33 +193,36 @@ namespace RenameFilesWinForms
 
                         if (needsMetadataWrite)
                         {
-                            string extension2 = Path.GetExtension(finalPath).ToLower();
-                            string backupDateString = originalFileDate.ToString("yyyy:MM:dd HH:mm:ss");
+                        */
+                        string extension2 = Path.GetExtension(finalPath).ToLower();
+                        string backupDateString = originalFileDate.ToString("yyyy:MM:dd HH:mm:ss");
 
-                            // Calculate your specific time variables
-                            string offsetStr = correctedTime.ToString("%K"); // e.g., -05:00
-                            string offsetShort = correctedTime.ToString("zzz"); // Timezone offset for AndroidTimeZone
-                            DateTime utcTime = correctedTime.ToUniversalTime();
+                        // Calculate your specific time variables
+                        string offsetStr = correctedTime.ToString("%K"); // e.g., -05:00
+                        string offsetShort = correctedTime.ToString("zzz"); // Timezone offset for AndroidTimeZone
+                        DateTime utcTime = correctedTime.ToUniversalTime();
 
-                            string exifArgs;
+                        string exifArgs;
 
-                            TimeSpan tzOffset = GetSelectedTimeZoneOffset(correctedTime);
+                        TimeSpan tzOffset = GetSelectedTimeZoneOffset(correctedTime);
 
-                            ExifModel exifModel = new ExifModel();
-                            exifModel.FinalPath = finalPath;
-                            exifModel.OriginalFileDate = originalFileDate;
-                            exifModel.CorrectedTime = correctedTime;
-                            exifModel.Make = make;
-                            exifModel.Model = model;
-                            exifModel.LatitudeText = latitudeText;
-                            exifModel.LongitudeText = longitudeText;
-                            exifModel.ForceUpdate = chkForce.Checked;
-                            exifModel.TzOffset = tzOffset;
-                            exifModel.FileHasCamera = hasCamera;
-                            exifModel.FileHasGps = hasGps;
+                        ExifModel exifModel = new ExifModel();
+                        exifModel.FinalPath = finalPath;
+                        exifModel.OriginalFileDate = originalFileDate;
+                        exifModel.CorrectedTime = correctedTime;
+                        exifModel.Make = curretExifModel.Make;
+                        exifModel.Model = curretExifModel.Model;
+                        exifModel.LatitudeText = latitudeText;
+                        exifModel.LongitudeText = longitudeText;
+                        exifModel.TzOffset = tzOffset;
+                        //   exifModel.FileHasCamera = hasCamera;
+                        //   exifModel.FileHasGps = hasGps;
+                        exifModel.Title = DetermineTitle(curretExifModel.Title,model.Title,model.ForceUpdate, fileInfo.Extension, mediaDate.Year.ToString());
 
-                            _exiftool.RunExifToolFinalSync(exifModel);
-                        }
+                        exifModel.Description = $"{txtDesc.Text} Original: {backupDateString}, Final: {correctedTime:yyyy-MM-dd HH:mm:ss} (UTC{offsetStr})";
+
+                        _exiftool.WriteMetadataToDisk(exifModel);
+                        //     }
                     }
                     catch (Exception ex)
                     {
@@ -213,10 +230,123 @@ namespace RenameFilesWinForms
                     }
                 }
             }
-            CleanScreen();
-            MessageBox.Show("Processing Complete!");
         }
 
+
+
+        private ExifModel GetCameraDefault(string[] fileNames, IExiftool metadataReader, RenameViewModel model)
+        {
+            // 1. Pass 1: Try to auto-detect from the file array
+            foreach (string file in fileNames)
+            {
+                string extension = Path.GetExtension(file).ToLower();
+                string[] validExtensions = new string[] { ".jpg", ".jpeg", ".png", ".heic", ".mpg", ".mp4", ".mts", ".avi" };
+
+                if (validExtensions.Contains(extension))
+                {
+                    // Clean interface hit—perfect for testing!
+                    ExifModel tempExifModel = metadataReader.GetFileMetadata(file);
+
+                    if (tempExifModel != null && !string.IsNullOrEmpty(tempExifModel.Make))
+                    {
+                        var detectedCamera = new ExifModel();
+                        detectedCamera.Make = NormalizeMake(tempExifModel.Make);
+                        detectedCamera.Model = NormalizeModel(detectedCamera.Make, tempExifModel.Model); // Fixed standard naming order
+                        return detectedCamera;
+                    }
+                }
+            }
+
+            // 2. Fallback: If auto-detect came up dry, try to use the UI model's preset
+            if (model.CameraPresets != null && !string.IsNullOrEmpty(model.CameraPresets.Make))
+            {
+                return new ExifModel
+                {
+                    Make = model.CameraPresets.Make,
+                    Model = model.CameraPresets.Model
+                };
+            }
+
+            // 3. Complete Failure: Return null to signal to the caller that no camera could be found anywhere
+            return null;
+        }
+
+        private RenameViewModel GetViewModel()
+        {
+            RenameViewModel model = new RenameViewModel
+            {
+                DirectoryPath = dirText.Text,
+                Title = txtTitle.Text,
+                Description = txtDesc.Text,
+                UseUTC = chkIsUTC.Checked,
+                UseDate = chkChangeDate.Checked,
+                MP4Only = chkMP4only.Checked,
+                ForceUpdate = chkForce.Checked,
+                CameraPresets = cboCamera.SelectedIndex > 0 ? (CameraPreset?)cboCamera.SelectedItem : null,
+                LocationPresets = cboLocations.SelectedIndex > 0 ? (LocationPreset?)cboLocations.SelectedItem : null
+                
+            };
+
+            try
+            {
+                // --- MASTER TIME OFFSETS ---
+                model.OffSetYears = Convert.ToInt32(txtYear.Text);
+                model.OffSetMonths = Convert.ToInt32(txtMonth.Text);
+                model.OffSetDays = Convert.ToInt32(txtDay.Text);
+                model.OffSetHours = Convert.ToInt32(txtHour.Text);
+                model.OffSetMinutes = Convert.ToInt32(txtMins.Text);
+                model.OffSetSeconds = Convert.ToInt32(txtSecs.Text);
+                // ---------------------------
+            }
+            catch
+            {
+                MessageBox.Show("Please enter a valid offset time value.");
+                return null;
+            }
+
+            if (model.UseDate)
+                model.ManualDateTime = model.UseDate ? (DateTime?)dtChange.Value : null;
+            else
+                model.ManualDateTime = null;
+
+            return model;
+        }
+
+        private string DetermineTitle(string currentTitle, string inputTitle, bool forceUpdate, string extension, string year)
+        {
+            currentTitle = currentTitle?.Trim() ?? "";
+            inputTitle = inputTitle?.Trim() ?? "";
+
+            // Determine if the file is a photo or video based on extension
+            string[] videoExtensions = { ".mpg", ".mp4", ".mts", ".avi", ".mov" };
+            string fileType = videoExtensions.Contains(extension.ToLower()) ? "video" : "photo";
+
+            // Rule 1: If "Force Update" is checked AND we have an input title, use it regardless
+            if (forceUpdate && !string.IsNullOrEmpty(inputTitle))
+            {
+                return inputTitle;
+            }
+
+            // Rule 2: If a valid title already exists (and doesn't start with Archived), LEAVE IT
+            if (!string.IsNullOrEmpty(currentTitle) && !currentTitle.StartsWith("Archived", StringComparison.OrdinalIgnoreCase))
+            {
+                return currentTitle;
+            }
+
+            // Rule 3: Title is empty OR starts with "Archived" -> check if we can upgrade it with inputTitle
+            if (string.IsNullOrEmpty(currentTitle) || currentTitle.StartsWith("Archived", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrEmpty(inputTitle))
+                {
+                    return inputTitle;
+                }
+            }
+
+            // Rule 4: Fallback if nothing else matches (Create standard "Archived (photo/video) Year")
+            // If we have a valid year, use it; otherwise fallback to the current year
+            string finalYear = !string.IsNullOrEmpty(year) ? year : DateTime.Now.Year.ToString();
+            return $"Archived {fileType} {finalYear}";
+        }
         private void CleanScreen()
         {
             dirText.Text = "";
@@ -240,9 +370,15 @@ namespace RenameFilesWinForms
         }
 
 
-        private DateTime AdjustMediaTime(DateTime originalTime, int offsetYear, int offsetMonth, int offsetDays, int offsetHour, int offsetMinute, int offsetSeconds)
+        private DateTime AdjustMediaTime(DateTime originalTime, RenameViewModel model)
         {
-            return originalTime.AddYears(offsetYear).AddMonths(offsetMonth).AddDays(offsetDays).AddHours(offsetHour).AddMinutes(offsetMinute).AddSeconds(offsetSeconds);
+            return originalTime
+                .AddYears(model.OffSetYears)
+                .AddMonths(model.OffSetMonths)
+                .AddDays(model.OffSetDays)
+                .AddHours(model.OffSetHours)
+                .AddMinutes(model.OffSetMinutes)
+                .AddSeconds(model.OffSetSeconds);
         }
 
         public static string GetNewFileName(FileInfo file, DateTime? metaDate)
@@ -289,90 +425,21 @@ namespace RenameFilesWinForms
             // Usually the ID, but we will often just grab the whole SelectedItem
             cboLocations.ValueMember = "LocationID";
         }
-        private bool HasCameraMetadata(string filePath)
+
+        private void LoadCameraComboBox()
         {
-            try
-            {
-                var directories = ImageMetadataReader.ReadMetadata(filePath);
+            // 1. Get the list from your SQL DB (ordered alphabetically as requested)
+            List<CameraPreset> cameras = GetActiveCameras();
+            cameras.Insert(0, new CameraPreset { CameraID = 0, DisplayName = "Unknown" }); // Add a default "None" option at the top
+            // 2. Set the DataSource
+            cboCamera.DataSource = cameras;
 
-                // 1. Check Photo Camera Data (Exif IFD0)
-                var ifd0Directory = directories.OfType<MetadataExtractor.Formats.Exif.ExifIfd0Directory>().FirstOrDefault();
-                if (ifd0Directory != null)
-                {
-                    bool hasMake = ifd0Directory.ContainsTag(MetadataExtractor.Formats.Exif.ExifDirectoryBase.TagMake);
-                    bool hasModel = ifd0Directory.ContainsTag(MetadataExtractor.Formats.Exif.ExifDirectoryBase.TagModel);
-                    if (hasMake || hasModel) return true;
-                }
+            // 3. Tell the box which property to show the user
+            cboCamera.DisplayMember = "DisplayName";
 
-                // 2. Check Video Camera Data (QuickTime Metadata Keys)
-                var qtMetaDirectory = directories.OfType<MetadataExtractor.Formats.QuickTime.QuickTimeMetadataHeaderDirectory>().FirstOrDefault();
-                if (qtMetaDirectory != null)
-                {
-                    bool hasTrackModel = qtMetaDirectory.ContainsTag(MetadataExtractor.Formats.QuickTime.QuickTimeMetadataHeaderDirectory.TagModel);
-                    if (hasTrackModel) return true;
-                }
-            }
-            catch
-            {
-                // If file is unreadable, default to false so processing can proceed safely
-            }
-
-            return false;
-        }
-
-        private bool HasGpsMetadata(string filePath)
-        {
-            try
-            {
-                var directories = ImageMetadataReader.ReadMetadata(filePath);
-
-                // 1. Check Photo GPS Data
-                var gpsDirectory = directories.OfType<MetadataExtractor.Formats.Exif.GpsDirectory>().FirstOrDefault();
-                if (gpsDirectory != null && gpsDirectory.ContainsTag(MetadataExtractor.Formats.Exif.GpsDirectory.TagLatitude))
-                {
-                    return true;
-                }
-
-                // 2. Check Video GPS Data (QuickTime Locations)
-                var qtMetaDirectory = directories.OfType<MetadataExtractor.Formats.QuickTime.QuickTimeMetadataHeaderDirectory>().FirstOrDefault();
-                if (qtMetaDirectory != null)
-                {
-                    bool hasLocation = qtMetaDirectory.ContainsTag(MetadataExtractor.Formats.QuickTime.QuickTimeMetadataHeaderDirectory.TagLocationName);
-                    if (hasLocation) return true;
-                }
-            }
-            catch
-            {
-                // If file is unreadable, default to false
-            }
-
-            return false;
-        }
-
-        // 1. Update the signature to accept 'TimeSpan tzOffset' at the end
-        // 1. Update the signature to accept 'TimeSpan tzOffset' at the end
-    
-
-        private string NewFileName(DateTime time)
-        {
-            // Format: YYYYMMDD_HHMMSS
-            return time.ToString("yyyyMMdd_HHmmss");
-        }
-
-        private static string AddedFileExtention(FileInfo fileInfo, string fileNameNoExt)
-        {
-            string ext = fileInfo.Extension.ToLower();
-
-            // Apply your specific extension formatting rules
-            string normalizedExt = ext switch
-            {
-                ".jpeg" => ".jpg",
-                ".mov" => ".MOV",
-                ".mts" => ".MTS",
-                _ => ext // Keeps others like .mp4, .png, .avi as lowercase
-            };
-
-            return fileNameNoExt + normalizedExt;
+            // 4. (Optional) Tell the box which property represents the "Value" 
+            // Usually the ID, but we will often just grab the whole SelectedItem
+            cboCamera.ValueMember = "CameraID";
         }
 
         private TimeSpan GetSelectedTimeZoneOffset(DateTime mediaDate)
@@ -454,7 +521,18 @@ namespace RenameFilesWinForms
             }
         }
 
-        private string MakerFix(String currentMaker)
+        public List<CameraPreset> GetActiveCameras()
+        {
+            using (var db = new SqlConnection(@"Server=.\SQLEXPRESS;Database=PhotoDB;Trusted_Connection=True;TrustServerCertificate=True;"))
+            {
+                // Added ORDER BY DisplayName to keep the list alphabetical
+                string sql = "SELECT * FROM CameraPresets WHERE IsActive = 1 ORDER BY DisplayName ASC";
+
+                return db.Query<CameraPreset>(sql).ToList();
+            }
+        }
+
+        private string NormalizeMake(String currentMaker)
         {
             string lookupKey = currentMaker.ToLowerInvariant();
             string standardName = String.Empty;
@@ -463,7 +541,20 @@ namespace RenameFilesWinForms
 
             return standardName;
         }
-private void checkBox1_CheckedChanged(object sender, EventArgs e)
+
+        // Currently Created the Model Normalization but a passthrew since keeping them regardless.  So the method is a placeholder for potential future logic if you want to clean up model variations as well.
+        private string NormalizeModel(string currentMake, String currentModel)
+        {
+           /*
+            string lookupKey = currentModel.ToLowerInvariant();
+            string standardName = String.Empty;
+            // 3. Check if it matches an inconsistent variation
+            MakerMap.TryGetValue(lookupKey, out standardName);
+           */
+            return currentModel;
+        }
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
         {
 
         }
@@ -476,6 +567,7 @@ private void checkBox1_CheckedChanged(object sender, EventArgs e)
         private void Form1_Load(object sender, EventArgs e)
         {
             LoadLocationComboBox();
+            LoadCameraComboBox();
         }
 
         private void cboLocations_SelectedIndexChanged(object sender, EventArgs e)

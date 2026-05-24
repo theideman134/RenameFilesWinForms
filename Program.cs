@@ -14,7 +14,8 @@ namespace RenameFilesWinForms
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
 
-            IExiftool exiftool = new Exiftool();
+            string exifToolPath = @"E:\exiftool\exiftool.exe";
+            IExiftool exiftool = new Exiftool(exifToolPath);
             Application.Run(new Form1(exiftool));
         }
     }
