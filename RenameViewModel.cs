@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace RenameFilesWinForms
+namespace MediaArchiver
 {
     public class RenameViewModel
     {

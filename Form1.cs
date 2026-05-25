@@ -1,5 +1,6 @@
 using Dapper;
 using Exiftools;
+using MediaArchiver;
 using MetadataExtractor;
 using MetadataExtractor.Formats.Avi;
 using MetadataExtractor.Formats.Exif;
@@ -370,7 +371,7 @@ namespace RenameFilesWinForms
         }
 
 
-        private DateTime AdjustMediaTime(DateTime originalTime, RenameViewModel model)
+        public DateTime AdjustMediaTime(DateTime originalTime, RenameViewModel model)
         {
             return originalTime
                 .AddYears(model.OffSetYears)

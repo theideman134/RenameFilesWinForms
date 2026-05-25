@@ -3,11 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.0.11222.15
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RenameFilesWinForms", "RenameFilesWinForms.csproj", "{E59FFBEC-8E26-4468-AB0A-62D159F15791}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MediaArchiver", "MediaArchiver.csproj", "{E59FFBEC-8E26-4468-AB0A-62D159F15791}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhotoDB", "..\PhotoDB\PhotoDB.csproj", "{1A5C890B-3450-4C5C-9164-306E0BFC83FC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Exiftools", "..\exiftool\Exiftools.csproj", "{7E91FC76-C94D-4462-BA2F-510D5DF85896}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MediaArchiver.Tests", "..\MediaArchiver.Tests\MediaArchiver.Tests.csproj", "{AE9FA19F-80AB-4AED-8054-8F16AE4BDA27}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,6 +29,10 @@ Global
 		{7E91FC76-C94D-4462-BA2F-510D5DF85896}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7E91FC76-C94D-4462-BA2F-510D5DF85896}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7E91FC76-C94D-4462-BA2F-510D5DF85896}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AE9FA19F-80AB-4AED-8054-8F16AE4BDA27}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AE9FA19F-80AB-4AED-8054-8F16AE4BDA27}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AE9FA19F-80AB-4AED-8054-8F16AE4BDA27}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AE9FA19F-80AB-4AED-8054-8F16AE4BDA27}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
