@@ -32,7 +32,7 @@ namespace RenameFilesWinForms
 
         // E:\exiftool\exiftool.exe -make -model -title -description -time:all -G1 -a -s "E:\picture3\2011-02-02 - Day after big storm - Copy\20110202_120246.jpg"
 
-       
+
         private void StartBtn_Click(object sender, EventArgs e)
         {
             if (!System.IO.Directory.Exists(dirText.Text))
@@ -60,7 +60,7 @@ namespace RenameFilesWinForms
 
 
 
-        
+
 
         private RenameViewModel GetViewModel()
         {
@@ -74,9 +74,12 @@ namespace RenameFilesWinForms
                 MP4Only = chkMP4only.Checked,
                 ForceUpdate = chkForce.Checked,
                 CameraPresets = cboCamera.SelectedIndex > 0 ? (CameraPreset?)cboCamera.SelectedItem : null,
-                LocationPresets = cboLocations.SelectedIndex > 0 ? (LocationPreset?)cboLocations.SelectedItem : null
-                
-            };
+                LocationPresets = cboLocations.SelectedIndex > 0 ? (LocationPreset?)cboLocations.SelectedItem : null,
+                ForceTitleDescUpdate = chkForceTitleUpdate.Checked,
+                ForceGPSUpdate = chkForceGPS.Checked,
+                ForceCameraUpdate = chkForceCamera.Checked
+
+    };
 
             try
             {
@@ -128,6 +131,12 @@ namespace RenameFilesWinForms
             dtChange.Update();
             chkChangeDate.Checked = false;
             chkChangeDate.Update();
+            chkForceGPS.Checked = false;
+            chkForceGPS.Update();
+            chkForceTitleUpdate.Checked = false;
+            chkForceTitleUpdate.Update();
+            chkForceCamera.Checked = false;
+            chkForceCamera.Update();
         }
 
 
@@ -236,6 +245,11 @@ namespace RenameFilesWinForms
         }
 
         private void cboLocations_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void checkBox3_CheckedChanged(object sender, EventArgs e)
         {
 
         }

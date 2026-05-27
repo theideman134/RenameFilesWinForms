@@ -23,6 +23,9 @@ namespace MediaArchiver
         public bool UseUTC { get; set; } = false;
         public bool UseDate {  get; set; } = false;
         public bool ForceUpdate { get; set; } = false;
+        public bool ForceTitleDescUpdate { get; set; } = false;
+        public bool ForceGPSUpdate { get; set; } = false;
+        public bool ForceCameraUpdate { get; set; } = false; 
 
 
     }

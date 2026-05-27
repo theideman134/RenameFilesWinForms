@@ -58,6 +58,11 @@
             rdoMountain = new RadioButton();
             rdoPacific = new RadioButton();
             rdoEastern = new RadioButton();
+            chkForceCamera = new CheckBox();
+            chkForceGPS = new CheckBox();
+            chkForceTitleUpdate = new CheckBox();
+            label8 = new Label();
+            label9 = new Label();
             SuspendLayout();
             // 
             // dirText
@@ -261,7 +266,7 @@
             // lblTitle
             // 
             lblTitle.AutoSize = true;
-            lblTitle.Location = new Point(27, 243);
+            lblTitle.Location = new Point(12, 243);
             lblTitle.Name = "lblTitle";
             lblTitle.Size = new Size(33, 15);
             lblTitle.TabIndex = 31;
@@ -269,7 +274,7 @@
             // 
             // txtTitle
             // 
-            txtTitle.Location = new Point(76, 235);
+            txtTitle.Location = new Point(64, 243);
             txtTitle.Name = "txtTitle";
             txtTitle.Size = new Size(541, 23);
             txtTitle.TabIndex = 30;
@@ -277,7 +282,7 @@
             // lblDesc
             // 
             lblDesc.AutoSize = true;
-            lblDesc.Location = new Point(12, 286);
+            lblDesc.Location = new Point(3, 286);
             lblDesc.Name = "lblDesc";
             lblDesc.Size = new Size(67, 15);
             lblDesc.TabIndex = 33;
@@ -335,11 +340,65 @@
             rdoEastern.Text = "Eastern";
             rdoEastern.UseVisualStyleBackColor = true;
             // 
+            // chkForceCamera
+            // 
+            chkForceCamera.AutoSize = true;
+            chkForceCamera.Location = new Point(544, 460);
+            chkForceCamera.Name = "chkForceCamera";
+            chkForceCamera.Size = new Size(99, 19);
+            chkForceCamera.TabIndex = 38;
+            chkForceCamera.Text = "Force Camera";
+            chkForceCamera.UseVisualStyleBackColor = true;
+            // 
+            // chkForceGPS
+            // 
+            chkForceGPS.AutoSize = true;
+            chkForceGPS.Location = new Point(544, 423);
+            chkForceGPS.Name = "chkForceGPS";
+            chkForceGPS.Size = new Size(79, 19);
+            chkForceGPS.TabIndex = 39;
+            chkForceGPS.Text = "Force GPS";
+            chkForceGPS.UseVisualStyleBackColor = true;
+            // 
+            // chkForceTitleUpdate
+            // 
+            chkForceTitleUpdate.AutoSize = true;
+            chkForceTitleUpdate.Location = new Point(544, 218);
+            chkForceTitleUpdate.Name = "chkForceTitleUpdate";
+            chkForceTitleUpdate.Size = new Size(111, 19);
+            chkForceTitleUpdate.TabIndex = 40;
+            chkForceTitleUpdate.Text = "Force Title/Desc";
+            chkForceTitleUpdate.UseVisualStyleBackColor = true;
+            chkForceTitleUpdate.CheckedChanged += checkBox3_CheckedChanged;
+            // 
+            // label8
+            // 
+            label8.AutoSize = true;
+            label8.Location = new Point(54, 427);
+            label8.Name = "label8";
+            label8.Size = new Size(28, 15);
+            label8.TabIndex = 41;
+            label8.Text = "GPS";
+            // 
+            // label9
+            // 
+            label9.AutoSize = true;
+            label9.Location = new Point(54, 466);
+            label9.Name = "label9";
+            label9.Size = new Size(48, 15);
+            label9.TabIndex = 42;
+            label9.Text = "Camera";
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(691, 586);
+            Controls.Add(label9);
+            Controls.Add(label8);
+            Controls.Add(chkForceTitleUpdate);
+            Controls.Add(chkForceGPS);
+            Controls.Add(chkForceCamera);
             Controls.Add(rdoEastern);
             Controls.Add(rdoPacific);
             Controls.Add(rdoMountain);
@@ -410,5 +469,10 @@
         private RadioButton rdoMountain;
         private RadioButton rdoPacific;
         private RadioButton rdoEastern;
+        private CheckBox chkForceCamera;
+        private CheckBox chkForceGPS;
+        private CheckBox chkForceTitleUpdate;
+        private Label label8;
+        private Label label9;
     }
 }

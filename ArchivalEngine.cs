@@ -4,224 +4,369 @@ using MetadataExtractor.Formats.Exif;
 using MetadataExtractor.Formats.QuickTime;
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.IO;
+using System.Linq;
+using System.Reflection.Metadata.Ecma335;
+using System.Text.RegularExpressions;
 
 namespace MediaArchiver
 {
     public class ArchivalEngine
     {
-        IExiftool _exiftool;
-        public ArchivalEngine(IExiftool exiftool) 
-        { 
+        private readonly IExiftool _exiftool;
+
+        public ArchivalEngine(IExiftool exiftool)
+        {
             _exiftool = exiftool;
         }
 
         private static readonly Dictionary<string, string> MakerMap = new Dictionary<string, string>
-    {
-        { "apple", "Apple" },
-        { "apple inc.", "Apple" },
-        { "canon inc.", "Canon" },
-        { "canon", "Canon" },
-        { "nikon corp.", "Nikon" },
-        { "nikon corp", "Nikon" },
-        { "nikon", "Nikon" },
-        { "samsung","Samsung" },
-        { "sony corp.", "Sony" },
-        { "sony corporation", "Sony" },
-        { "sony", "Sony" },
-        { "fujifilm co.", "Fujifilm" },
-        { "fujifilm", "Fujifilm" }
-    };
+        {
+            { "apple", "Apple" },
+            { "apple inc.", "Apple" },
+            { "canon inc.", "Canon" },
+            { "canon", "Canon" },
+            { "nikon corp.", "Nikon" },
+            { "nikon corp", "Nikon" },
+            { "nikon corporation", "Nikon" },
+            { "nikon", "Nikon" },
+            { "samsung","Samsung" },
+            { "sony corp.", "Sony" },
+            { "sony corporation", "Sony" },
+            { "sony", "Sony" },
+            { "fujifilm co.", "Fujifilm" },
+            { "fujifilm", "Fujifilm" }
+        };
 
+        // --- ORCHESTRATION LAYER: Handles the physical file system side effects ---
         public void ProcessFiles(IExiftool exiftool, RenameViewModel model, string[] fileNames)
         {
-            string latitudeText = model.LocationPresets?.Latitude.ToString() ?? "";
-            string longitudeText = model.LocationPresets?.Longitude.ToString() ?? "";
-
-            // 1. DEFAULT BEHAVIOR: Attempt Auto-Detection first
-
-            // Scan the directory to find a file with valid camera metadata
             ExifModel defaultCamera = GetCameraDefault(fileNames, _exiftool, model);
 
             if (defaultCamera == null)
             {
-                MessageBox.Show(
-                      "Could not detect camera metadata automatically. Please manually select the camera profile from the dropdown.",
-                      "Camera Metadata Missing",
-                      MessageBoxButtons.OK,
-                      MessageBoxIcon.Warning
-                );
-                return;
+                throw new Exception("Could not detect camera metadata automatically. Please manually select the camera profile from the dropdown.");
             }
 
             foreach (string file in fileNames)
             {
-                string[] validExtensions = null;
+                FileInfo fileInfo = new FileInfo(file);
+                if (!fileInfo.Exists) continue;
 
-                if (model.MP4Only)
+                // 1. In-memory data retrieval side effects
+                ExifModel currentExifModel = exiftool.GetFileMetadata(fileInfo.FullName) ?? new ExifModel();
+                DateTime originalFileDate = GetDateTaken(fileInfo.FullName, model.UseUTC, out bool hasMetadata);
+
+                // 2. CALL PURE ENGINE: Calculate the blueprint in-memory. 
+                // We pass a delegate function 'File.Exists' so the loop can check duplication without hardcoding disk access!
+                ExifModel targetBlueprint = BuildTargetMetadata(
+                    model,
+                    defaultCamera,
+                    fileInfo.DirectoryName,
+                    fileInfo.FullName,
+                    currentExifModel,
+                    originalFileDate,
+                    File.Exists
+                );
+
+                if (targetBlueprint == null) continue;
+
+                // 3. PHYSICAL DISK EXECUTION LAYER: Run side effects sequentially
+                if (!string.Equals(targetBlueprint.FinalPath, fileInfo.FullName, StringComparison.OrdinalIgnoreCase))
                 {
-                    validExtensions = new string[] { ".mp4" };
+                    // Ensure destination directory exists (insurance policy)
+                    string targetDir = Path.GetDirectoryName(targetBlueprint.FinalPath);
+                    if (!System.IO.Directory.Exists(targetDir))
+                    {
+                        System.IO.Directory.CreateDirectory(targetDir);
+                    }
+
+                    fileInfo.MoveTo(targetBlueprint.FinalPath);
+                }
+
+                // Write the updated EXIF metadata back to the file at its final destination
+                SaveMetaData(targetBlueprint);
+            }
+        }
+
+        // --- PURE CALCULATION ENGINE: 100% Testable in memory with zero disk access ---
+        public ExifModel BuildTargetMetadata(
+        RenameViewModel model,
+        ExifModel defaultCamera,
+        string directoryName,
+        string fullName,
+        ExifModel currentExifModel,
+        DateTime originalFileDate,
+        Func<string, bool> fileExistsCheck)
+        {
+            currentExifModel ??= new ExifModel();
+            ExifModel exifModel = currentExifModel.Clone();
+
+            // Local internal extractions to replace the parameters we removed
+            string fileName = Path.GetFileName(fullName);
+            string fileExtension = Path.GetExtension(fullName);
+
+            // 1. Camera Profile Normalization
+            if (!string.IsNullOrWhiteSpace(currentExifModel.Make) && !model.ForceCameraUpdate)
+            {
+                exifModel.Make = NormalizeMake(currentExifModel.Make);
+                exifModel.Model = NormalizeModel(currentExifModel.Make, currentExifModel.Model);
+            }
+            else
+            {
+                exifModel.Make = defaultCamera.Make;
+                exifModel.Model = defaultCamera.Model;
+            }
+
+            // 2. GPS Location Presets (Using your requested ternary optimization pattern)
+            exifModel.LatitudeText = model.ForceGPSUpdate || string.IsNullOrEmpty(exifModel.LatitudeText)
+                ? model.LocationPresets?.Latitude.ToString() ?? ""
+                : exifModel.LatitudeText;
+
+            exifModel.LongitudeText = model.ForceGPSUpdate || string.IsNullOrEmpty(exifModel.LongitudeText)
+                ? model.LocationPresets?.Longitude.ToString() ?? ""
+                : exifModel.LongitudeText;
+
+            // 3. Timeline Adjustments
+            DateTime mediaDate = model.UseDate && model.ManualDateTime.HasValue
+                ? new DateTime(model.ManualDateTime.Value.Year, model.ManualDateTime.Value.Month, model.ManualDateTime.Value.Day, originalFileDate.Hour, originalFileDate.Minute, originalFileDate.Second)
+                : originalFileDate;
+
+            DateTime correctedTime = AdjustMediaTime(mediaDate, model);
+
+            // 4. In-Memory Path Calculation & Conflict Resolution
+            string newName = correctedTime.ToString("yyyyMMdd_HHmmss");
+            string finalPath = Path.Combine(directoryName, newName + fileExtension);
+
+            int count = 1;
+            // Instead of calling File.Exists directly, we invoke the delegate we passed in!
+            while (fileExistsCheck(finalPath) && !string.Equals(finalPath, fullName, StringComparison.OrdinalIgnoreCase))
+            {
+                finalPath = Path.Combine(directoryName, $"{newName}_{count:D2}{fileExtension}");
+                count++;
+            }
+
+            // 5. Populate Data Objects
+            string backupDateString = originalFileDate.ToString("yyyy:MM:dd HH:mm:ss");
+
+            TimeSpan tzOffset = GetSelectedTimeZoneOffset(correctedTime, model);
+            string sign = tzOffset.Ticks >= 0 ? "+" : "-";
+            string offsetStr = $"{sign}{Math.Abs(tzOffset.Hours):D2}:{Math.Abs(tzOffset.Minutes):D2}";
+
+            exifModel.FinalPath = finalPath;
+            exifModel.OriginalFileDate = originalFileDate;
+            exifModel.CorrectedTime = correctedTime;
+            exifModel.TzOffset = tzOffset;
+
+      
+            // 1. Calculate the final title first (as you already do)
+            exifModel.Title = DetermineTitle(currentExifModel.Title, model.Title, model.ForceUpdate, fileExtension, mediaDate.Year.ToString());
+
+            // 2. Pass the title and the UseTitle flag down into the description resolver
+            string baseDescription = ResolveBaseDescription(model, currentExifModel, exifModel.Title); ;
+
+            // 3. Fetch the geographic location suffix text
+            string locationSuffix = BuildLocationSuffix(model);
+
+            // 4. FUSE THEM TOGETHER: This defines the missing 'fullCaptionText' variable!
+            string fullCaptionText = !string.IsNullOrEmpty(locationSuffix)
+                ? $"{baseDescription}{locationSuffix}".Trim()
+                : baseDescription;
+
+            // 5. CALL THE METHOD: This defines the missing 'cleanOriginalDateStr' variable!
+            string cleanOriginalDateStr = ParseOriginalDateDescription(currentExifModel, originalFileDate);
+
+            // 6. CALL THE TIMEZONE METHOD: This gets your "CST", "EDT", etc.
+            string tzAbbreviation = GetTimeZoneAbbreviation(model.TimeZone, correctedTime);
+
+
+            // 7. Compile the final standardized tracking string output
+            exifModel.Description = string.IsNullOrEmpty(fullCaptionText)
+                    ? $"Original: {cleanOriginalDateStr}, Final: {correctedTime:yyyy-MM-dd HH:mm:ss} ({tzAbbreviation}{offsetStr})"
+                    : $"{fullCaptionText}. Original: {cleanOriginalDateStr}, Final: {correctedTime:yyyy-MM-dd HH:mm:ss} ({tzAbbreviation}{offsetStr})";
+
+            // ────────────────────────────────────────────────────────────────────
+            return exifModel;
+        }
+
+        private string GetTimeZoneAbbreviation(string windowsTimeZoneId, DateTime correctedTime)
+        {
+            if (string.IsNullOrEmpty(windowsTimeZoneId)) return "UTC";
+
+            try
+            {
+                // Fetch the actual timezone rule object from the Windows registry
+                TimeZoneInfo tzInfo = TimeZoneInfo.FindSystemTimeZoneById(windowsTimeZoneId);
+
+                // Ask Windows: "Is this specific file date currently in Daylight Saving Time?"
+                bool isDaylight = tzInfo.IsDaylightSavingTime(correctedTime);
+
+                // Map the official Windows Zone ID to its baseline US root abbreviation
+                return windowsTimeZoneId switch
+                {
+                    "Eastern Standard Time" => isDaylight ? "EDT" : "EST",
+                    "Central Standard Time" => isDaylight ? "CDT" : "CST",
+                    "Mountain Standard Time" => isDaylight ? "MDT" : "MST",
+                    "Pacific Standard Time" => isDaylight ? "PDT" : "PST",
+                    "Alaskan Standard Time" => isDaylight ? "AKDT" : "AKST",
+                    "Hawaiian Standard Time" => isDaylight ? "HDT" : "HST", // Note: Hawaii doesn't observe DST, but the registry key supports it safely
+                    _ => "UTC" // Failsafe fallback
+                };
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return "UTC"; // Failsafe if a strange zone string slips through
+            }
+        }
+
+        private string BuildLocationSuffix(RenameViewModel model)
+        {
+            string locationName = model.LocationPresets?.LocationName?.Trim() ?? string.Empty;
+            string city = model.LocationPresets?.City?.Trim() ?? string.Empty;
+            string state = model.LocationPresets?.State?.Trim() ?? string.Empty;
+
+            // Build the geographical string safely (e.g., "Chicago, IL")
+            var locationParts = new List<string>();
+            if (!string.IsNullOrEmpty(city)) locationParts.Add(city);
+            if (!string.IsNullOrEmpty(state)) locationParts.Add(state);
+            string geoPlace = string.Join(", ", locationParts);
+
+            // Formulate the caption modifier text
+            if (!string.IsNullOrEmpty(locationName) && !string.IsNullOrEmpty(geoPlace))
+            {
+                return $" at {locationName} ({geoPlace})";
+            }
+            if (!string.IsNullOrEmpty(locationName))
+            {
+                return $" at {locationName}";
+            }
+            if (!string.IsNullOrEmpty(geoPlace))
+            {
+                return $" in {geoPlace}";
+            }
+
+            return string.Empty;
+        }
+
+        private string ResolveBaseDescription(RenameViewModel model, ExifModel currentMetadata, string calculatedTitle)
+        {
+            // ─── FIXED FLAG CHECK: Return Description, not Title! ───────────────
+            if (model.ForceTitleDescUpdate && !string.IsNullOrEmpty(model.Description))
+            {
+                return model.Description.Trim();
+            }
+            // ──────────────────────────────────────────────────────────────────────
+
+            // 1. Fallback to standard UI model state description text
+            string baseDescription = model.Description?.Trim() ?? string.Empty;
+
+            // 2. STICKY STATE PROTECTION: If UI is blank, rescue the historical caption
+            if (string.IsNullOrEmpty(baseDescription) && !string.IsNullOrEmpty(currentMetadata?.Description))
+            {
+                if (currentMetadata.Description.Contains("Original:"))
+                {
+                    int markerIndex = currentMetadata.Description.IndexOf("Original:");
+                    string oldCaption = currentMetadata.Description.Substring(0, markerIndex).Trim();
+
+                    if (oldCaption.EndsWith("."))
+                    {
+                        oldCaption = oldCaption.Substring(0, oldCaption.Length - 1).Trim();
+                    }
+
+                    baseDescription = oldCaption;
                 }
                 else
                 {
-                    validExtensions = new string[] { ".jpg", ".jpeg", ".png", ".heic", ".mpg", ".mp4", ".mts", ".avi" };
+                    baseDescription = currentMetadata.Description.Trim();
                 }
+            }
 
-                FileInfo fileInfo = new FileInfo(file);
+            return baseDescription;
+        }
 
-                if (fileInfo.Exists && validExtensions.Contains(fileInfo.Extension.ToLower()))
+        private string ParseOriginalDateDescription(ExifModel currentMetadata, DateTime originalFileDate)
+    {
+        if (!string.IsNullOrEmpty(currentMetadata?.Description))
+        {
+            // This pattern looks for "Original: " followed by exactly: 4 digits, 2 digits, 2 digits (date) 
+            // and then 2 digits, 2 digits, 2 digits (time), separated by colons and spaces.
+            var match = Regex.Match(currentMetadata.Description, @"Original:\s*(\d{4}:\d{2}:\d{2}\s+\d{2}:\d{2}:\d{2})");
+
+            if (match.Success)
+            {
+                // Group[1] captures just the clean timestamp block inside the parentheses!
+                return match.Groups[1].Value.Trim();
+            }
+        }
+
+        // First-time processing fallback: establish the fresh original baseline from the file
+        return originalFileDate.ToString("yyyy:MM:dd HH:mm:ss");
+    }
+
+        private string ResolveBaseDescription(RenameViewModel model, ExifModel currentMetadata)
+        {
+            // 1. Resolve the baseline text from the current UI model state
+            string baseDescription = model.Description?.Trim() ?? string.Empty;
+
+            // 2. STICKY STATE PROTECTION: If the UI description is blank, rescue the historical caption!
+            if (string.IsNullOrEmpty(baseDescription) && !string.IsNullOrEmpty(currentMetadata?.Description))
+            {
+                // If the old description contains our tracking marker, split and grab everything BEFORE it
+                if (currentMetadata.Description.Contains("Original:"))
                 {
+                    int markerIndex = currentMetadata.Description.IndexOf("Original:");
+                    string oldCaption = currentMetadata.Description.Substring(0, markerIndex).Trim();
 
-                    ExifModel curretExifModel = exiftool.GetFileMetadata(fileInfo.FullName);
-
-                    // 1. Ensure we have a safe model instance right off the bat
-                    curretExifModel ??= new ExifModel();
-
-                    // 2. Resolve the Make string cleanly
-                    if (!string.IsNullOrWhiteSpace(curretExifModel.Make))
+                    // Clean up trailing periods so they don't compound (e.g. "Graduation Day... Original:")
+                    if (oldCaption.EndsWith("."))
                     {
-                        curretExifModel.Make = NormalizeMake(curretExifModel.Make);
-                    }
-                    else
-                    {
-                        curretExifModel.Make = defaultCamera.Make; // Pulled from your clean default baseline object!
+                        oldCaption = oldCaption.Substring(0, oldCaption.Length - 1).Trim();
                     }
 
-                    // 3. Resolve the Model string cleanly (using the resolved Make)
-                    if (!string.IsNullOrWhiteSpace(curretExifModel.Model))
-                    {
-                        curretExifModel.Model = NormalizeModel(curretExifModel.Make, curretExifModel.Model);
-                    }
-                    else
-                    {
-                        curretExifModel.Model = defaultCamera.Model; // Pulled from your clean default baseline object!
-                    }
-
-                    // 1. Extract raw date and check if actual metadata existed
-                    DateTime originalFileDate = GetDateTaken(fileInfo.FullName, model.UseUTC, out bool hasMetadata);
-                    DateTime mediaDate;
-
-                    //          bool hasGps = HasGpsMetadata(fileInfo.FullName);
-
-                    if (model.UseDate)
-                    {
-                        // Override Date, keep Time
-                        mediaDate = new DateTime(
-                            model.ManualDateTime.Value.Year,
-                            model.ManualDateTime.Value.Month,
-                            model.ManualDateTime.Value.Day,
-                            originalFileDate.Hour,
-                            originalFileDate.Minute,
-                            originalFileDate.Second
-                        );
-                    }
-                    else
-                    {
-                        mediaDate = originalFileDate;
-                    }
-
-                    // 2. Apply offsets
-                    DateTime correctedTime = AdjustMediaTime(mediaDate, model);
-
-                    // 3. Setup renaming
-                    string newName = correctedTime.ToString("yyyyMMdd_HHmmss");
-                    string extension = fileInfo.Extension;
-                    string finalPath = Path.Combine(fileInfo.DirectoryName, newName + extension);
-
-                    int count = 1;
-                    while (File.Exists(finalPath) && finalPath.ToLower() != fileInfo.FullName.ToLower())
-                    {
-                        finalPath = Path.Combine(fileInfo.DirectoryName, $"{newName}_{count:D2}{extension}");
-                        count++;
-                    }
-
-                    try
-                    {
-                        // Move/Rename
-                        if (finalPath.ToLower() != fileInfo.FullName.ToLower())
-                        {
-                            fileInfo.MoveTo(finalPath);
-                        }
-
-                        /*
-                        // Determine if we need to trigger ExifTool
-                        bool needsMetadataWrite = !hasMetadata ||
-                                                  offsetYears != 0 ||
-                                                  offsetMonths != 0 ||
-                                                  offsetDays != 0 ||
-                                                  offsetHours != 0 ||
-                                                  offsetMinutes != 0 ||
-                                                  offsetSeconds != 0 ||
-                                                  chkChangeDate.Checked ||
-                                                  chkMP4only.Checked ||
-                                                  chkForce.Checked ||
-                                                  cboLocations.SelectedIndex > 0;                                                  ;
-
-                        if (needsMetadataWrite)
-                        {
-                        */
-                        string extension2 = Path.GetExtension(finalPath).ToLower();
-                        string backupDateString = originalFileDate.ToString("yyyy:MM:dd HH:mm:ss");
-
-                        // Calculate your specific time variables
-                        string offsetStr = correctedTime.ToString("%K"); // e.g., -05:00
-                        string offsetShort = correctedTime.ToString("zzz"); // Timezone offset for AndroidTimeZone
-                        DateTime utcTime = correctedTime.ToUniversalTime();
-
-                        string exifArgs;
-
-                        TimeSpan tzOffset = GetSelectedTimeZoneOffset(correctedTime,model);
-
-                        ExifModel exifModel = new ExifModel();
-                        exifModel.FinalPath = finalPath;
-                        exifModel.OriginalFileDate = originalFileDate;
-                        exifModel.CorrectedTime = correctedTime;
-                        exifModel.Make = curretExifModel.Make;
-                        exifModel.Model = curretExifModel.Model;
-                        exifModel.LatitudeText = latitudeText;
-                        exifModel.LongitudeText = longitudeText;
-                        exifModel.TzOffset = tzOffset;
-                        //   exifModel.FileHasCamera = hasCamera;
-                        //   exifModel.FileHasGps = hasGps;
-                        exifModel.Title = DetermineTitle(curretExifModel.Title, model.Title, model.ForceUpdate, fileInfo.Extension, mediaDate.Year.ToString());
-
-                        exifModel.Description = $"{model.Description} Original: {backupDateString}, Final: {correctedTime:yyyy-MM-dd HH:mm:ss} (UTC{offsetStr})";
-
-                        _exiftool.WriteMetadataToDisk(exifModel);
-                        //     }
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Failed to process {fileInfo.Name}: {ex.Message}");
-                    }
+                    baseDescription = oldCaption;
                 }
+                else
+                {
+                    // If it doesn't contain the token yet, the entire string is our raw legacy caption baseline
+                    baseDescription = currentMetadata.Description.Trim();
+                }
+            }
+
+            return baseDescription;
+        }
+        private void SaveMetaData(ExifModel exifModel)
+        {
+            try
+            {
+                _exiftool.WriteMetadataToDisk(exifModel);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to write metadata for {exifModel.FinalPath}: {ex.Message}");
             }
         }
 
         private ExifModel GetCameraDefault(string[] fileNames, IExiftool metadataReader, RenameViewModel model)
         {
-            // 1. Pass 1: Try to auto-detect from the file array
             foreach (string file in fileNames)
             {
                 string extension = Path.GetExtension(file).ToLower();
-                string[] validExtensions = new string[] { ".jpg", ".jpeg", ".png", ".heic", ".mpg", ".mp4", ".mts", ".avi" };
+                string[] validExtensions = { ".jpg", ".jpeg", ".png", ".heic", ".mpg", ".mp4", ".mts", ".avi" };
 
                 if (validExtensions.Contains(extension))
                 {
-                    // Clean interface hit—perfect for testing!
                     ExifModel tempExifModel = metadataReader.GetFileMetadata(file);
 
                     if (tempExifModel != null && !string.IsNullOrEmpty(tempExifModel.Make))
                     {
                         var detectedCamera = new ExifModel();
                         detectedCamera.Make = NormalizeMake(tempExifModel.Make);
-                        detectedCamera.Model = NormalizeModel(detectedCamera.Make, tempExifModel.Model); // Fixed standard naming order
+                        detectedCamera.Model = NormalizeModel(detectedCamera.Make, tempExifModel.Model);
                         return detectedCamera;
                     }
                 }
             }
 
-            // 2. Fallback: If auto-detect came up dry, try to use the UI model's preset
             if (model.CameraPresets != null && !string.IsNullOrEmpty(model.CameraPresets.Make))
             {
                 return new ExifModel
@@ -231,9 +376,9 @@ namespace MediaArchiver
                 };
             }
 
-            // 3. Complete Failure: Return null to signal to the caller that no camera could be found anywhere
             return null;
         }
+
         public DateTime AdjustMediaTime(DateTime originalTime, RenameViewModel model)
         {
             return originalTime
@@ -244,77 +389,57 @@ namespace MediaArchiver
                 .AddMinutes(model.OffSetMinutes)
                 .AddSeconds(model.OffSetSeconds);
         }
+
         public TimeSpan GetSelectedTimeZoneOffset(DateTime mediaDate, RenameViewModel model)
         {
-            TimeZoneInfo tz;
-
-            // Determine which timezone to use based on the model's TimeZone property
-            tz = TimeZoneInfo.FindSystemTimeZoneById(model.TimeZone);
-            // Get the UTC offset for the specific date (this automatically handles Daylight Saving Time)
+            TimeZoneInfo tz = TimeZoneInfo.FindSystemTimeZoneById(model.TimeZone);
             return tz.GetUtcOffset(mediaDate);
         }
+
         public string DetermineTitle(string currentTitle, string inputTitle, bool forceUpdate, string extension, string year)
         {
             currentTitle = currentTitle?.Trim() ?? "";
             inputTitle = inputTitle?.Trim() ?? "";
 
-            // Determine if the file is a photo or video based on extension
             string[] videoExtensions = { ".mpg", ".mp4", ".mts", ".avi", ".mov" };
             string fileType = videoExtensions.Contains(extension.ToLower()) ? "video" : "photo";
 
-            // Rule 1: If "Force Update" is checked AND we have an input title, use it regardless
-            if (forceUpdate && !string.IsNullOrEmpty(inputTitle))
-            {
-                return inputTitle;
-            }
+            if (forceUpdate && !string.IsNullOrEmpty(inputTitle)) return inputTitle;
+            if (!string.IsNullOrEmpty(currentTitle) && !currentTitle.StartsWith("Archived", StringComparison.OrdinalIgnoreCase)) return currentTitle;
 
-            // Rule 2: If a valid title already exists (and doesn't start with Archived), LEAVE IT
-            if (!string.IsNullOrEmpty(currentTitle) && !currentTitle.StartsWith("Archived", StringComparison.OrdinalIgnoreCase))
-            {
-                return currentTitle;
-            }
-
-            // Rule 3: Title is empty OR starts with "Archived" -> check if we can upgrade it with inputTitle
             if (string.IsNullOrEmpty(currentTitle) || currentTitle.StartsWith("Archived", StringComparison.OrdinalIgnoreCase))
             {
-                if (!string.IsNullOrEmpty(inputTitle))
-                {
-                    return inputTitle;
-                }
+                if (!string.IsNullOrEmpty(inputTitle)) return inputTitle;
             }
 
-            // Rule 4: Fallback if nothing else matches (Create standard "Archived (photo/video) Year")
-            // If we have a valid year, use it; otherwise fallback to the current year
             string finalYear = !string.IsNullOrEmpty(year) ? year : DateTime.Now.Year.ToString();
             return $"Archived {fileType} {finalYear}";
         }
-        private string NormalizeMake(String currentMaker)
-        {
-            string lookupKey = currentMaker.ToLowerInvariant();
-            string standardName = String.Empty;
-            // 3. Check if it matches an inconsistent variation
-            MakerMap.TryGetValue(lookupKey, out standardName);
 
-            return standardName;
+        public string NormalizeMake(string currentMaker)
+        {
+            if (string.IsNullOrWhiteSpace(currentMaker)) return string.Empty;
+            string cleanMaker = new string(currentMaker.Where(c => !char.IsControl(c)).ToArray());
+            string lookupKey = cleanMaker.ToLowerInvariant().Trim();
+
+            foreach (var kvp in MakerMap)
+            {
+                if (lookupKey.Contains(kvp.Key)) return kvp.Value;
+            }
+
+            return cleanMaker.Trim();
         }
 
-        // Currently Created the Model Normalization but a passthrew since keeping them regardless.  So the method is a placeholder for potential future logic if you want to clean up model variations as well.
-        private string NormalizeModel(string currentMake, String currentModel)
+        public string NormalizeModel(string currentMake, string currentModel)
         {
-            /*
-             string lookupKey = currentModel.ToLowerInvariant();
-             string standardName = String.Empty;
-             // 3. Check if it matches an inconsistent variation
-             MakerMap.TryGetValue(lookupKey, out standardName);
-            */
             return currentModel;
         }
-        static DateTime GetDateTaken(string filePath, bool isTrueUTC, out bool hasMetadata)
+
+        private static DateTime GetDateTaken(string filePath, bool isTrueUTC, out bool hasMetadata)
         {
             hasMetadata = false;
             string fileName = Path.GetFileNameWithoutExtension(filePath);
 
-            // 1. Filename remains the Gold Standard for local time
             if (DateTime.TryParseExact(fileName, "yyyyMMdd_HHmmss", null, System.Globalization.DateTimeStyles.AssumeLocal, out DateTime parsedDate))
             {
                 hasMetadata = true;
@@ -325,18 +450,13 @@ namespace MediaArchiver
             {
                 var directories = ImageMetadataReader.ReadMetadata(filePath);
 
-                // --- NEW: CHECK ANDROID/APPLE KEYS FIRST ---
-                // These tags (Keys:CreationDate) usually contain the offset, making them bulletproof.
                 var keysDirectory = directories.OfType<QuickTimeMetadataHeaderDirectory>().FirstOrDefault();
                 if (keysDirectory != null && keysDirectory.TryGetDateTime(QuickTimeMetadataHeaderDirectory.TagCreationDate, out DateTime keysDate))
                 {
                     hasMetadata = true;
-                    // If the key was read correctly, MetadataExtractor often handles the offset conversion.
-                    // We force it to Local to ensure your downstream offset math (15/20 hrs) is consistent.
                     return keysDate.ToLocalTime();
                 }
 
-                // --- PHOTO LOGIC ---
                 var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
                 if (subIfdDirectory != null && subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out DateTime exifDate))
                 {
@@ -344,12 +464,10 @@ namespace MediaArchiver
                     return DateTime.SpecifyKind(exifDate, DateTimeKind.Local);
                 }
 
-                // --- VIDEO LOGIC (Fallback for older files without 'Keys') ---
                 var movDirectory = directories.OfType<QuickTimeMovieHeaderDirectory>().FirstOrDefault();
                 if (movDirectory != null && movDirectory.TryGetDateTime(QuickTimeMovieHeaderDirectory.TagCreated, out DateTime movDate))
                 {
                     hasMetadata = true;
-                    // If we are here, we don't have an offset key, so we use your batch toggle
                     return isTrueUTC ? DateTime.SpecifyKind(movDate, DateTimeKind.Utc).ToLocalTime()
                                      : DateTime.SpecifyKind(movDate, DateTimeKind.Local);
                 }
