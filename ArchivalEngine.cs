@@ -104,28 +104,16 @@ namespace MediaArchiver
 
             // Local internal extractions to replace the parameters we removed
             string fileName = Path.GetFileName(fullName);
-            string fileExtension = Path.GetExtension(fullName);
+            // Captures whatever extension the file has (.JPG, .Jpg, etc.)
+            string rawExtension = Path.GetExtension(fullName);
 
-            // 1. Camera Profile Normalization
-            if (!string.IsNullOrWhiteSpace(currentExifModel.Make) && !model.ForceCameraUpdate)
-            {
-                exifModel.Make = NormalizeMake(currentExifModel.Make);
-                exifModel.Model = NormalizeModel(currentExifModel.Make, currentExifModel.Model);
-            }
-            else
-            {
-                exifModel.Make = defaultCamera.Make;
-                exifModel.Model = defaultCamera.Model;
-            }
+            // Standardizes it strictly to lowercase (.jpg)
+            string cleanExtension = rawExtension.ToLowerInvariant();
+
+            SetCameraValues(model, defaultCamera, currentExifModel, exifModel);
 
             // 2. GPS Location Presets (Using your requested ternary optimization pattern)
-            exifModel.LatitudeText = model.ForceGPSUpdate || string.IsNullOrEmpty(exifModel.LatitudeText)
-                ? model.LocationPresets?.Latitude.ToString() ?? ""
-                : exifModel.LatitudeText;
-
-            exifModel.LongitudeText = model.ForceGPSUpdate || string.IsNullOrEmpty(exifModel.LongitudeText)
-                ? model.LocationPresets?.Longitude.ToString() ?? ""
-                : exifModel.LongitudeText;
+            SetGPS(model, exifModel,currentExifModel);
 
             // 3. Timeline Adjustments
             DateTime mediaDate = model.UseDate && model.ManualDateTime.HasValue
@@ -136,13 +124,13 @@ namespace MediaArchiver
 
             // 4. In-Memory Path Calculation & Conflict Resolution
             string newName = correctedTime.ToString("yyyyMMdd_HHmmss");
-            string finalPath = Path.Combine(directoryName, newName + fileExtension);
+            string finalPath = Path.Combine(directoryName, newName + cleanExtension);
 
             int count = 1;
             // Instead of calling File.Exists directly, we invoke the delegate we passed in!
             while (fileExistsCheck(finalPath) && !string.Equals(finalPath, fullName, StringComparison.OrdinalIgnoreCase))
             {
-                finalPath = Path.Combine(directoryName, $"{newName}_{count:D2}{fileExtension}");
+                finalPath = Path.Combine(directoryName, $"{newName}_{count:D2}{cleanExtension}");
                 count++;
             }
 
@@ -158,9 +146,9 @@ namespace MediaArchiver
             exifModel.CorrectedTime = correctedTime;
             exifModel.TzOffset = tzOffset;
 
-      
+
             // 1. Calculate the final title first (as you already do)
-            exifModel.Title = DetermineTitle(currentExifModel.Title, model.Title, model.ForceUpdate, fileExtension, mediaDate.Year.ToString());
+            exifModel.Title = DetermineTitle(currentExifModel.Title, model.Title, model.ForceUpdate, cleanExtension, mediaDate.Year.ToString());
 
             // 2. Pass the title and the UseTitle flag down into the description resolver
             string baseDescription = ResolveBaseDescription(model, currentExifModel, exifModel.Title); ;
@@ -187,6 +175,61 @@ namespace MediaArchiver
 
             // ────────────────────────────────────────────────────────────────────
             return exifModel;
+        }
+
+        public void SetCameraValues(RenameViewModel model, ExifModel defaultCamera, ExifModel currentExifModel, ExifModel exifModel)
+        {
+            // LAYER 1: If box is CHECKED, unconditionally force the UI Screen Dropdown Preset
+            if (model.ForceCameraUpdate)
+            {
+                if (model.CameraPresets != null && !string.IsNullOrWhiteSpace(model.CameraPresets.Make))
+                {
+                    exifModel.Make = model.CameraPresets.Make;
+                    exifModel.Model = model.CameraPresets.Model;
+                }
+                return;
+            }
+
+            // LAYER 2: Box is UNCHECKED, protect existing file history
+            if (currentExifModel != null && !string.IsNullOrWhiteSpace(currentExifModel.Make))
+            {
+                exifModel.Make = NormalizeMake(currentExifModel.Make);
+                exifModel.Model = NormalizeModel(currentExifModel.Make, currentExifModel.Model);
+            }
+            // LAYER 3: EXCEPTION - Box is unchecked & file is empty -> Use the Directory Default Camera profile
+            else if (defaultCamera != null && !string.IsNullOrWhiteSpace(defaultCamera.Make))
+            {
+                exifModel.Make = defaultCamera.Make;
+                exifModel.Model = defaultCamera.Model;
+            }
+            // LAYER 4: FALLBACK - Box is unchecked, file is empty, and no directory camera exists -> Use UI Screen Preset
+            else if (model.CameraPresets != null && !string.IsNullOrWhiteSpace(model.CameraPresets.Make))
+            {
+                exifModel.Make = model.CameraPresets.Make;
+                exifModel.Model = model.CameraPresets.Model;
+            }
+        }
+
+        public void SetGPS(RenameViewModel model, ExifModel exifModel, ExifModel currentExifModel)
+        {
+            // LAYER 1: If box is CHECKED, explicitly force the UI screen coordinates
+            if (model.ForceGPSUpdate)
+            {
+                exifModel.LatitudeText = model.LocationPresets?.Latitude.ToString() ?? "";
+                exifModel.LongitudeText = model.LocationPresets?.Longitude.ToString() ?? "";
+            }
+            // LAYER 2: If box is UNCHECKED, protect the history if the file has data
+            else if (currentExifModel != null && !string.IsNullOrEmpty(currentExifModel.LatitudeText))
+            {
+                exifModel.LatitudeText = currentExifModel.LatitudeText;
+                exifModel.LongitudeText = currentExifModel.LongitudeText;
+            }
+            // LAYER 3: FALLBACK - Box is unchecked but file is empty, use the UI screen coordinates
+            else
+            {
+                exifModel.LatitudeText = model.LocationPresets?.Latitude.ToString() ?? "";
+                exifModel.LongitudeText = model.LocationPresets?.Longitude.ToString() ?? "";
+            }
         }
 
         private string GetTimeZoneAbbreviation(string windowsTimeZoneId, DateTime correctedTime)
