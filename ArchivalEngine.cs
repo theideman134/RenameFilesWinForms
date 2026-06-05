@@ -90,53 +90,45 @@ namespace MediaArchiver
         }
 
         // --- PURE CALCULATION ENGINE: 100% Testable in memory with zero disk access ---
+        // --- PURE CALCULATION ENGINE: 100% Automated Scenario C ---
         public ExifModel BuildTargetMetadata(
-        RenameViewModel model,
-        ExifModel defaultCamera,
-        string directoryName,
-        string fullName,
-        ExifModel currentExifModel,
-        DateTime originalFileDate,
-        Func<string, bool> fileExistsCheck)
+            RenameViewModel model,
+            ExifModel defaultCamera,
+            string directoryName,
+            string fullName,
+            ExifModel currentExifModel,
+            DateTime originalFileDate,
+            Func<string, bool> fileExistsCheck)
         {
             currentExifModel ??= new ExifModel();
             ExifModel exifModel = currentExifModel.Clone();
 
-            // Local internal extractions to replace the parameters we removed
-            string fileName = Path.GetFileName(fullName);
-            // Captures whatever extension the file has (.JPG, .Jpg, etc.)
             string rawExtension = Path.GetExtension(fullName);
-
-            // Standardizes it strictly to lowercase (.jpg)
             string cleanExtension = rawExtension.ToLowerInvariant();
 
+            // 1. Set Hardware & GPS standard baselines
             SetCameraValues(model, defaultCamera, currentExifModel, exifModel);
+            SetGPS(model, exifModel, currentExifModel);
 
-            // 2. GPS Location Presets (Using your requested ternary optimization pattern)
-            SetGPS(model, exifModel,currentExifModel);
-
-            // 3. Timeline Adjustments
+            // 2. Timeline Adjustments
             DateTime mediaDate = model.UseDate && model.ManualDateTime.HasValue
                 ? new DateTime(model.ManualDateTime.Value.Year, model.ManualDateTime.Value.Month, model.ManualDateTime.Value.Day, originalFileDate.Hour, originalFileDate.Minute, originalFileDate.Second)
                 : originalFileDate;
 
             DateTime correctedTime = AdjustMediaTime(mediaDate, model);
 
-            // 4. In-Memory Path Calculation & Conflict Resolution
+            // 3. Unique Filename Generation & Conflict Resolution (Natural Keys)
             string newName = correctedTime.ToString("yyyyMMdd_HHmmss");
             string finalPath = Path.Combine(directoryName, newName + cleanExtension);
 
             int count = 1;
-            // Instead of calling File.Exists directly, we invoke the delegate we passed in!
             while (fileExistsCheck(finalPath) && !string.Equals(finalPath, fullName, StringComparison.OrdinalIgnoreCase))
             {
                 finalPath = Path.Combine(directoryName, $"{newName}_{count:D2}{cleanExtension}");
                 count++;
             }
 
-            // 5. Populate Data Objects
-            string backupDateString = originalFileDate.ToString("yyyy:MM:dd HH:mm:ss");
-
+            // 4. Calculate Timezone Triggers
             TimeSpan tzOffset = GetSelectedTimeZoneOffset(correctedTime, model);
             string sign = tzOffset.Ticks >= 0 ? "+" : "-";
             string offsetStr = $"{sign}{Math.Abs(tzOffset.Hours):D2}:{Math.Abs(tzOffset.Minutes):D2}";
@@ -146,36 +138,25 @@ namespace MediaArchiver
             exifModel.CorrectedTime = correctedTime;
             exifModel.TzOffset = tzOffset;
 
-
-            // 1. Calculate the final title first (as you already do)
+            // 5. THE LEAN TITLE EXCEPTION: Photos return string.Empty; Videos get "Archived video [Year]"
             exifModel.Title = DetermineTitle(currentExifModel.Title, model.Title, model.ForceUpdate, cleanExtension, mediaDate.Year.ToString());
 
-            // 2. Pass the title and the UseTitle flag down into the description resolver
-            string baseDescription = ResolveBaseDescription(model, currentExifModel, exifModel.Title); ;
-
-            // 3. Fetch the geographic location suffix text
-            string locationSuffix = BuildLocationSuffix(model);
-
-            // 4. FUSE THEM TOGETHER: This defines the missing 'fullCaptionText' variable!
-            string fullCaptionText = !string.IsNullOrEmpty(locationSuffix)
-                ? $"{baseDescription}{locationSuffix}".Trim()
-                : baseDescription;
-
-            // 5. CALL THE METHOD: This defines the missing 'cleanOriginalDateStr' variable!
+            // 6. SCENARIO C TRACKING STRING: No text gluing, no UI lookups. Pure immutable technical audit trail.
             string cleanOriginalDateStr = ParseOriginalDateDescription(currentExifModel, originalFileDate);
-
-            // 6. CALL THE TIMEZONE METHOD: This gets your "CST", "EDT", etc.
             string tzAbbreviation = GetTimeZoneAbbreviation(model.TimeZone, correctedTime);
 
+            if (model.LocationPresets != null && !string.IsNullOrWhiteSpace(model.LocationPresets.LocationCode))
+            {
+                string locationSuffix = BuildLocationSuffix(model);
+                exifModel.Description = $"Location: {model.LocationPresets.LocationCode}, Original: {cleanOriginalDateStr}, Final: {correctedTime:yyyy-MM-dd HH:mm:ss} ({tzAbbreviation}{offsetStr})";
+            }
+            else
+            {
+                exifModel.Description = $"Original: {cleanOriginalDateStr}, Final: {correctedTime:yyyy-MM-dd HH:mm:ss} ({tzAbbreviation}{offsetStr})";
+            }
 
-            // 7. Compile the final standardized tracking string output
-            exifModel.Description = string.IsNullOrEmpty(fullCaptionText)
-                    ? $"Original: {cleanOriginalDateStr}, Final: {correctedTime:yyyy-MM-dd HH:mm:ss} ({tzAbbreviation}{offsetStr})"
-                    : $"{fullCaptionText}. Original: {cleanOriginalDateStr}, Final: {correctedTime:yyyy-MM-dd HH:mm:ss} ({tzAbbreviation}{offsetStr})";
-
-            // ────────────────────────────────────────────────────────────────────
             return exifModel;
-        }
+        } 
 
         public void SetCameraValues(RenameViewModel model, ExifModel defaultCamera, ExifModel currentExifModel, ExifModel exifModel)
         {
@@ -447,7 +428,7 @@ namespace MediaArchiver
             string[] videoExtensions = { ".mpg", ".mp4", ".mts", ".avi", ".mov" };
             string fileType = videoExtensions.Contains(extension.ToLower()) ? "video" : "photo";
 
-            if (forceUpdate && !string.IsNullOrEmpty(inputTitle)) return inputTitle;
+            if (forceUpdate) return inputTitle;
             if (!string.IsNullOrEmpty(currentTitle) && !currentTitle.StartsWith("Archived", StringComparison.OrdinalIgnoreCase)) return currentTitle;
 
             if (string.IsNullOrEmpty(currentTitle) || currentTitle.StartsWith("Archived", StringComparison.OrdinalIgnoreCase))

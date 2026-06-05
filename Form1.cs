@@ -32,7 +32,7 @@ namespace RenameFilesWinForms
 
         // E:\exiftool\exiftool.exe -make -model -title -description -time:all -G1 -a -s "E:\picture3\2011-02-02 - Day after big storm - Copy\20110202_120246.jpg"
 
-
+        //E:\exiftool\exiftool.exe -make -model -title -description -n -GPSLatitude -GPSlongitude -time:all -G1 -a -s "E:\mobile\2026-04\20260417_142152.heic"
         private void StartBtn_Click(object sender, EventArgs e)
         {
             if (!System.IO.Directory.Exists(dirText.Text))
@@ -210,7 +210,7 @@ namespace RenameFilesWinForms
             using (var db = new SqlConnection(@"Server=.\SQLEXPRESS;Database=PhotoDB;Trusted_Connection=True;TrustServerCertificate=True;"))
             {
                 // Added ORDER BY LocationName to keep the list alphabetical
-                string sql = "SELECT * FROM LocationPresets WHERE IsActive = 1 ORDER BY LocationName ASC";
+                string sql = "SELECT * FROM Locations WHERE IsActive = 1 ORDER BY LocationName ASC";
 
                 return db.Query<LocationPreset>(sql).ToList();
             }
@@ -221,7 +221,7 @@ namespace RenameFilesWinForms
             using (var db = new SqlConnection(@"Server=.\SQLEXPRESS;Database=PhotoDB;Trusted_Connection=True;TrustServerCertificate=True;"))
             {
                 // Added ORDER BY DisplayName to keep the list alphabetical
-                string sql = "SELECT * FROM CameraPresets WHERE IsActive = 1 ORDER BY DisplayName ASC";
+                string sql = "SELECT * FROM Cameras WHERE IsActive = 1 ORDER BY DisplayName ASC";
 
                 return db.Query<CameraPreset>(sql).ToList();
             }
