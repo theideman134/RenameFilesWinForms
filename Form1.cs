@@ -79,7 +79,7 @@ namespace RenameFilesWinForms
                 ForceGPSUpdate = chkForceGPS.Checked,
                 ForceCameraUpdate = chkForceCamera.Checked
 
-    };
+            };
 
             try
             {
@@ -174,7 +174,7 @@ namespace RenameFilesWinForms
         private void LoadLocationComboBox()
         {
             // 1. Get the list from your SQL DB (ordered alphabetically as requested)
-            List<LocationPreset> locations = GetActiveLocations();
+            List<LocationPreset> locations = GetFilteredLocations(txtCity.Text, txtState.Text, chkInActive.Checked);
             locations.Insert(0, new LocationPreset { LocationID = 0, LocationName = "None" }); // Add a default "None" option at the top
             // 2. Set the DataSource
             cboLocations.DataSource = locations;
@@ -203,18 +203,26 @@ namespace RenameFilesWinForms
             cboCamera.ValueMember = "CameraID";
         }
 
-
-
-        public List<LocationPreset> GetActiveLocations()
+        public List<LocationPreset> GetFilteredLocations(string city = null, string state = null, bool includeInactive = false)
         {
-            using (var db = new SqlConnection(@"Server=.\SQLEXPRESS;Database=PhotoDB;Trusted_Connection=True;TrustServerCertificate=True;"))
+            string connectionString = @"Server=.\SQLEXPRESS;Database=PhotoDB;Trusted_Connection=True;TrustServerCertificate=True;";
+            using (var db = new SqlConnection(connectionString))
             {
-                // Added ORDER BY LocationName to keep the list alphabetical
-                string sql = "SELECT * FROM Locations WHERE IsActive = 1 ORDER BY LocationName ASC";
+                // We use a CASE statement to append '[HISTORIC]' or '[CLOSED]' to the name if IsActive = 0
+                string sql = @"
+            SELECT *
+            FROM dbo.Locations 
+            WHERE 1=1";
+                if (!includeInactive) sql += " AND IsActive = 1";
+                if (!string.IsNullOrEmpty(state)) sql += " AND State = @State";
+                if (!string.IsNullOrEmpty(city)) sql += " AND City = @City";
 
-                return db.Query<LocationPreset>(sql).ToList();
+                sql += " ORDER BY IsActive DESC, LocationName ASC"; // Keeps active ones at the top, or pure alphabetical
+
+                return db.Query<LocationPreset>(sql, new { State = state, City = city }).ToList();
             }
         }
+
 
         public List<CameraPreset> GetActiveCameras()
         {
@@ -252,6 +260,11 @@ namespace RenameFilesWinForms
         private void checkBox3_CheckedChanged(object sender, EventArgs e)
         {
 
+        }
+
+        private void btnUpdateGPS_Click(object sender, EventArgs e)
+        {
+            LoadLocationComboBox();
         }
     }
 }

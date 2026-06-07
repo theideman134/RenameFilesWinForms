@@ -63,6 +63,12 @@
             chkForceTitleUpdate = new CheckBox();
             label8 = new Label();
             label9 = new Label();
+            lblCity = new Label();
+            lblState = new Label();
+            chkInActive = new CheckBox();
+            txtCity = new TextBox();
+            txtState = new TextBox();
+            btnUpdateGPS = new Button();
             SuspendLayout();
             // 
             // dirText
@@ -224,7 +230,7 @@
             // chkMP4only
             // 
             chkMP4only.AutoSize = true;
-            chkMP4only.Location = new Point(574, 143);
+            chkMP4only.Location = new Point(574, 152);
             chkMP4only.Name = "chkMP4only";
             chkMP4only.Size = new Size(76, 19);
             chkMP4only.TabIndex = 18;
@@ -290,10 +296,10 @@
             // 
             // txtDesc
             // 
-            txtDesc.Location = new Point(76, 283);
+            txtDesc.Location = new Point(76, 286);
             txtDesc.Multiline = true;
             txtDesc.Name = "txtDesc";
-            txtDesc.Size = new Size(541, 120);
+            txtDesc.Size = new Size(529, 51);
             txtDesc.TabIndex = 32;
             // 
             // rdoCentral
@@ -363,7 +369,7 @@
             // chkForceTitleUpdate
             // 
             chkForceTitleUpdate.AutoSize = true;
-            chkForceTitleUpdate.Location = new Point(544, 218);
+            chkForceTitleUpdate.Location = new Point(574, 202);
             chkForceTitleUpdate.Name = "chkForceTitleUpdate";
             chkForceTitleUpdate.Size = new Size(111, 19);
             chkForceTitleUpdate.TabIndex = 40;
@@ -374,7 +380,7 @@
             // label8
             // 
             label8.AutoSize = true;
-            label8.Location = new Point(54, 427);
+            label8.Location = new Point(105, 427);
             label8.Name = "label8";
             label8.Size = new Size(28, 15);
             label8.TabIndex = 41;
@@ -383,17 +389,76 @@
             // label9
             // 
             label9.AutoSize = true;
-            label9.Location = new Point(54, 466);
+            label9.Location = new Point(105, 466);
             label9.Name = "label9";
             label9.Size = new Size(48, 15);
             label9.TabIndex = 42;
             label9.Text = "Camera";
+            // 
+            // lblCity
+            // 
+            lblCity.AutoSize = true;
+            lblCity.Location = new Point(105, 391);
+            lblCity.Name = "lblCity";
+            lblCity.Size = new Size(28, 15);
+            lblCity.TabIndex = 43;
+            lblCity.Text = "City";
+            // 
+            // lblState
+            // 
+            lblState.AutoSize = true;
+            lblState.Location = new Point(387, 392);
+            lblState.Name = "lblState";
+            lblState.Size = new Size(33, 15);
+            lblState.TabIndex = 44;
+            lblState.Text = "State";
+            // 
+            // chkInActive
+            // 
+            chkInActive.AutoSize = true;
+            chkInActive.Location = new Point(481, 390);
+            chkInActive.Name = "chkInActive";
+            chkInActive.Size = new Size(67, 19);
+            chkInActive.TabIndex = 45;
+            chkInActive.Text = "Inactive";
+            chkInActive.UseVisualStyleBackColor = true;
+            // 
+            // txtCity
+            // 
+            txtCity.Location = new Point(176, 388);
+            txtCity.Name = "txtCity";
+            txtCity.Size = new Size(205, 23);
+            txtCity.TabIndex = 46;
+            // 
+            // txtState
+            // 
+            txtState.Location = new Point(426, 388);
+            txtState.MaxLength = 2;
+            txtState.Name = "txtState";
+            txtState.Size = new Size(49, 23);
+            txtState.TabIndex = 47;
+            // 
+            // btnUpdateGPS
+            // 
+            btnUpdateGPS.Location = new Point(546, 387);
+            btnUpdateGPS.Name = "btnUpdateGPS";
+            btnUpdateGPS.Size = new Size(100, 25);
+            btnUpdateGPS.TabIndex = 48;
+            btnUpdateGPS.Text = "Update GPS";
+            btnUpdateGPS.UseVisualStyleBackColor = true;
+            btnUpdateGPS.Click += btnUpdateGPS_Click;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(691, 586);
+            Controls.Add(btnUpdateGPS);
+            Controls.Add(txtState);
+            Controls.Add(txtCity);
+            Controls.Add(chkInActive);
+            Controls.Add(lblState);
+            Controls.Add(lblCity);
             Controls.Add(label9);
             Controls.Add(label8);
             Controls.Add(chkForceTitleUpdate);
@@ -474,5 +539,11 @@
         private CheckBox chkForceTitleUpdate;
         private Label label8;
         private Label label9;
+        private Label lblCity;
+        private Label lblState;
+        private CheckBox chkInActive;
+        private TextBox txtCity;
+        private TextBox txtState;
+        private Button btnUpdateGPS;
     }
 }
