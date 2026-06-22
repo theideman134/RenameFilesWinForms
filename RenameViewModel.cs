@@ -13,7 +13,7 @@ namespace MediaArchiver
         public int OffSetHours { get; set; }
         public int OffSetMinutes { get; set; }
         public int OffSetSeconds { get; set; }
-        public string Title { get; set; }
+        public string AltName { get; set; }
         public string Description { get; set; }
         public string TimeZone { get; set; } = string.Empty;
         public DateTime? ManualDateTime { get; set; }

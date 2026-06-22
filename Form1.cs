@@ -67,8 +67,7 @@ namespace RenameFilesWinForms
             RenameViewModel model = new RenameViewModel
             {
                 DirectoryPath = dirText.Text,
-                Title = txtTitle.Text,
-                Description = txtDesc.Text,
+                AltName = txtAltName.Text,
                 UseUTC = chkIsUTC.Checked,
                 UseDate = chkChangeDate.Checked,
                 MP4Only = chkMP4only.Checked,
@@ -266,5 +265,6 @@ namespace RenameFilesWinForms
         {
             LoadLocationComboBox();
         }
+
     }
 }

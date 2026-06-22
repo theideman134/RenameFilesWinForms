@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             dirText = new TextBox();
             StartBtn = new Button();
             label1 = new Label();
@@ -51,9 +52,7 @@
             cboLocations = new ComboBox();
             cboCamera = new ComboBox();
             lblTitle = new Label();
-            txtTitle = new TextBox();
-            lblDesc = new Label();
-            txtDesc = new TextBox();
+            txtAltName = new TextBox();
             rdoCentral = new RadioButton();
             rdoMountain = new RadioButton();
             rdoPacific = new RadioButton();
@@ -69,6 +68,7 @@
             txtCity = new TextBox();
             txtState = new TextBox();
             btnUpdateGPS = new Button();
+            txtManualGPS = new TextBox();
             SuspendLayout();
             // 
             // dirText
@@ -80,7 +80,7 @@
             // 
             // StartBtn
             // 
-            StartBtn.Location = new Point(237, 498);
+            StartBtn.Location = new Point(214, 441);
             StartBtn.Name = "StartBtn";
             StartBtn.Size = new Size(199, 76);
             StartBtn.TabIndex = 1;
@@ -253,18 +253,17 @@
             cboLocations.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
             cboLocations.AutoCompleteSource = AutoCompleteSource.ListItems;
             cboLocations.FormattingEnabled = true;
-            cboLocations.Location = new Point(176, 419);
+            cboLocations.Location = new Point(153, 331);
             cboLocations.Name = "cboLocations";
             cboLocations.Size = new Size(352, 23);
             cboLocations.TabIndex = 28;
-            cboLocations.SelectedIndexChanged += cboLocations_SelectedIndexChanged;
             // 
             // cboCamera
             // 
             cboCamera.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
             cboCamera.AutoCompleteSource = AutoCompleteSource.ListItems;
             cboCamera.FormattingEnabled = true;
-            cboCamera.Location = new Point(176, 458);
+            cboCamera.Location = new Point(153, 389);
             cboCamera.Name = "cboCamera";
             cboCamera.Size = new Size(352, 23);
             cboCamera.TabIndex = 29;
@@ -272,35 +271,18 @@
             // lblTitle
             // 
             lblTitle.AutoSize = true;
-            lblTitle.Location = new Point(12, 243);
+            lblTitle.Location = new Point(25, 243);
             lblTitle.Name = "lblTitle";
-            lblTitle.Size = new Size(33, 15);
+            lblTitle.Size = new Size(60, 15);
             lblTitle.TabIndex = 31;
-            lblTitle.Text = "Title:";
+            lblTitle.Text = "Alt Name:";
             // 
-            // txtTitle
+            // txtAltName
             // 
-            txtTitle.Location = new Point(64, 243);
-            txtTitle.Name = "txtTitle";
-            txtTitle.Size = new Size(541, 23);
-            txtTitle.TabIndex = 30;
-            // 
-            // lblDesc
-            // 
-            lblDesc.AutoSize = true;
-            lblDesc.Location = new Point(3, 286);
-            lblDesc.Name = "lblDesc";
-            lblDesc.Size = new Size(67, 15);
-            lblDesc.TabIndex = 33;
-            lblDesc.Text = "Description";
-            // 
-            // txtDesc
-            // 
-            txtDesc.Location = new Point(76, 286);
-            txtDesc.Multiline = true;
-            txtDesc.Name = "txtDesc";
-            txtDesc.Size = new Size(529, 51);
-            txtDesc.TabIndex = 32;
+            txtAltName.Location = new Point(105, 240);
+            txtAltName.Name = "txtAltName";
+            txtAltName.Size = new Size(484, 23);
+            txtAltName.TabIndex = 30;
             // 
             // rdoCentral
             // 
@@ -349,7 +331,7 @@
             // chkForceCamera
             // 
             chkForceCamera.AutoSize = true;
-            chkForceCamera.Location = new Point(544, 460);
+            chkForceCamera.Location = new Point(521, 393);
             chkForceCamera.Name = "chkForceCamera";
             chkForceCamera.Size = new Size(99, 19);
             chkForceCamera.TabIndex = 38;
@@ -359,7 +341,7 @@
             // chkForceGPS
             // 
             chkForceGPS.AutoSize = true;
-            chkForceGPS.Location = new Point(544, 423);
+            chkForceGPS.Location = new Point(521, 335);
             chkForceGPS.Name = "chkForceGPS";
             chkForceGPS.Size = new Size(79, 19);
             chkForceGPS.TabIndex = 39;
@@ -380,7 +362,7 @@
             // label8
             // 
             label8.AutoSize = true;
-            label8.Location = new Point(105, 427);
+            label8.Location = new Point(82, 339);
             label8.Name = "label8";
             label8.Size = new Size(28, 15);
             label8.TabIndex = 41;
@@ -389,7 +371,7 @@
             // label9
             // 
             label9.AutoSize = true;
-            label9.Location = new Point(105, 466);
+            label9.Location = new Point(82, 389);
             label9.Name = "label9";
             label9.Size = new Size(48, 15);
             label9.TabIndex = 42;
@@ -398,7 +380,7 @@
             // lblCity
             // 
             lblCity.AutoSize = true;
-            lblCity.Location = new Point(105, 391);
+            lblCity.Location = new Point(82, 303);
             lblCity.Name = "lblCity";
             lblCity.Size = new Size(28, 15);
             lblCity.TabIndex = 43;
@@ -407,7 +389,7 @@
             // lblState
             // 
             lblState.AutoSize = true;
-            lblState.Location = new Point(387, 392);
+            lblState.Location = new Point(364, 304);
             lblState.Name = "lblState";
             lblState.Size = new Size(33, 15);
             lblState.TabIndex = 44;
@@ -416,7 +398,7 @@
             // chkInActive
             // 
             chkInActive.AutoSize = true;
-            chkInActive.Location = new Point(481, 390);
+            chkInActive.Location = new Point(458, 302);
             chkInActive.Name = "chkInActive";
             chkInActive.Size = new Size(67, 19);
             chkInActive.TabIndex = 45;
@@ -425,14 +407,14 @@
             // 
             // txtCity
             // 
-            txtCity.Location = new Point(176, 388);
+            txtCity.Location = new Point(153, 300);
             txtCity.Name = "txtCity";
             txtCity.Size = new Size(205, 23);
             txtCity.TabIndex = 46;
             // 
             // txtState
             // 
-            txtState.Location = new Point(426, 388);
+            txtState.Location = new Point(403, 300);
             txtState.MaxLength = 2;
             txtState.Name = "txtState";
             txtState.Size = new Size(49, 23);
@@ -440,7 +422,7 @@
             // 
             // btnUpdateGPS
             // 
-            btnUpdateGPS.Location = new Point(546, 387);
+            btnUpdateGPS.Location = new Point(523, 299);
             btnUpdateGPS.Name = "btnUpdateGPS";
             btnUpdateGPS.Size = new Size(100, 25);
             btnUpdateGPS.TabIndex = 48;
@@ -448,11 +430,19 @@
             btnUpdateGPS.UseVisualStyleBackColor = true;
             btnUpdateGPS.Click += btnUpdateGPS_Click;
             // 
+            // txtManualGPS
+            // 
+            txtManualGPS.Location = new Point(153, 359);
+            txtManualGPS.Name = "txtManualGPS";
+            txtManualGPS.Size = new Size(352, 23);
+            txtManualGPS.TabIndex = 49;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(691, 586);
+            Controls.Add(txtManualGPS);
             Controls.Add(btnUpdateGPS);
             Controls.Add(txtState);
             Controls.Add(txtCity);
@@ -468,10 +458,8 @@
             Controls.Add(rdoPacific);
             Controls.Add(rdoMountain);
             Controls.Add(rdoCentral);
-            Controls.Add(lblDesc);
-            Controls.Add(txtDesc);
             Controls.Add(lblTitle);
-            Controls.Add(txtTitle);
+            Controls.Add(txtAltName);
             Controls.Add(cboCamera);
             Controls.Add(cboLocations);
             Controls.Add(chkForce);
@@ -494,6 +482,7 @@
             Controls.Add(label1);
             Controls.Add(StartBtn);
             Controls.Add(dirText);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "Form1";
             Text = "Rename Files";
             Load += Form1_Load;
@@ -527,9 +516,7 @@
         private ComboBox cboLocations;
         private ComboBox cboCamera;
         private Label lblTitle;
-        private TextBox txtTitle;
-        private Label lblDesc;
-        private TextBox txtDesc;
+        private TextBox txtAltName;
         private RadioButton rdoCentral;
         private RadioButton rdoMountain;
         private RadioButton rdoPacific;
@@ -545,5 +532,6 @@
         private TextBox txtCity;
         private TextBox txtState;
         private Button btnUpdateGPS;
+        private TextBox txtManualGPS;
     }
 }

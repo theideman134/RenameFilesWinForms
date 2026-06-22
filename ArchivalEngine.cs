@@ -87,7 +87,53 @@ namespace MediaArchiver
                 // Write the updated EXIF metadata back to the file at its final destination
                 SaveMetaData(targetBlueprint);
             }
+            // 2. Evaluate if the folder name needs a GPS prepend before moving
+            DirectoryInfo dirInfo = new DirectoryInfo(model.DirectoryPath);
+            string dirName = dirInfo.Name;
+
+            // Check if the current folder name starts with a 4-digit year
+            bool startsWithYear = Regex.IsMatch(dirName, @"^\d{4}");
+            string workingDirName = dirName;
+
+            if (!startsWithYear && model.LocationPresets != null && !string.IsNullOrEmpty(model.LocationPresets.LocationName))
+            {
+                workingDirName = $"{model.LocationPresets.LocationName}";
+            }
+
+            // 3. Set up the destination path ("...\timefix\MCD")
+            // dirInfo.Parent.FullName gets us "E:\picture3\2014"
+            string parentPath = dirInfo.Parent.FullName;
+            string timefixPath = Path.Combine(parentPath, "timefix");
+
+            // Create the 'timefix' directory if it doesn't exist yet
+            if (!System.IO.Directory.Exists(timefixPath))
+            {
+                System.IO.Directory.CreateDirectory(timefixPath);
+            }
+
+
+            // 4. Move the directory to mark it done
+            string finalDestinationPath = Path.Combine(timefixPath, workingDirName);
+
+            if (System.IO.Directory.Exists(finalDestinationPath))
+            {
+                int counter = 1;
+                string uniqueDirName = workingDirName;
+
+                // Keep incrementing the counter until a unique folder name is found
+                while (System.IO.Directory.Exists(Path.Combine(timefixPath, uniqueDirName)))
+                {
+                    uniqueDirName = $"{workingDirName}_{counter}";
+                    counter++;
+                }
+
+                finalDestinationPath = Path.Combine(timefixPath, uniqueDirName);
+            }
+
+            // 5. Safely move the directory
+            System.IO.Directory.Move(model.DirectoryPath, finalDestinationPath);
         }
+    
 
         // --- PURE CALCULATION ENGINE: 100% Testable in memory with zero disk access ---
         // --- PURE CALCULATION ENGINE: 100% Automated Scenario C ---
@@ -104,27 +150,51 @@ namespace MediaArchiver
             ExifModel exifModel = currentExifModel.Clone();
 
             string rawExtension = Path.GetExtension(fullName);
+
             string cleanExtension = rawExtension.ToLowerInvariant();
+
+            if (cleanExtension == ".jfif")
+                cleanExtension = ".jpg";
 
             // 1. Set Hardware & GPS standard baselines
             SetCameraValues(model, defaultCamera, currentExifModel, exifModel);
             SetGPS(model, exifModel, currentExifModel);
+
+            currentExifModel.IsMobile = IsMobileDevice(exifModel);
 
             // 2. Timeline Adjustments
             DateTime mediaDate = model.UseDate && model.ManualDateTime.HasValue
                 ? new DateTime(model.ManualDateTime.Value.Year, model.ManualDateTime.Value.Month, model.ManualDateTime.Value.Day, originalFileDate.Hour, originalFileDate.Minute, originalFileDate.Second)
                 : originalFileDate;
 
-            DateTime correctedTime = AdjustMediaTime(mediaDate, model);
+            DateTime correctedTime = AdjustMediaTime(mediaDate, model, currentExifModel);
 
             // 3. Unique Filename Generation & Conflict Resolution (Natural Keys)
-            string newName = correctedTime.ToString("yyyyMMdd_HHmmss");
+            string newName = "";
+            if(!String.IsNullOrEmpty(model.AltName))
+            {
+                newName = model.AltName.Trim();
+            }
+            else
+            {
+                newName = correctedTime.ToString("yyyyMMdd_HHmmss");
+            }
+            
+                      
+            
             string finalPath = Path.Combine(directoryName, newName + cleanExtension);
 
             int count = 1;
             while (fileExistsCheck(finalPath) && !string.Equals(finalPath, fullName, StringComparison.OrdinalIgnoreCase))
             {
-                finalPath = Path.Combine(directoryName, $"{newName}_{count:D2}{cleanExtension}");
+                if(String.IsNullOrEmpty(model.AltName))
+                {
+                    finalPath = Path.Combine(directoryName, $"{newName}_{count:D2}{cleanExtension}");
+                }
+                else
+                {
+                    finalPath = Path.Combine(directoryName, $"{newName} {count:D2}{cleanExtension}");
+                }
                 count++;
             }
 
@@ -139,7 +209,7 @@ namespace MediaArchiver
             exifModel.TzOffset = tzOffset;
 
             // 5. THE LEAN TITLE EXCEPTION: Photos return string.Empty; Videos get "Archived video [Year]"
-            exifModel.Title = DetermineTitle(currentExifModel.Title, model.Title, model.ForceUpdate, cleanExtension, mediaDate.Year.ToString());
+            exifModel.Title = DetermineTitle(currentExifModel.Title, model.ForceUpdate, cleanExtension, mediaDate.Year.ToString());
 
             // 6. SCENARIO C TRACKING STRING: No text gluing, no UI lookups. Pure immutable technical audit trail.
             string cleanOriginalDateStr = ParseOriginalDateDescription(currentExifModel, originalFileDate);
@@ -156,8 +226,29 @@ namespace MediaArchiver
             }
 
             return exifModel;
-        } 
+        }
+        private bool IsMobileDevice(ExifModel exif)
+        {
+            if (exif == null) return false;
 
+            // Grab the Make or Model (adjust these property names to match your ExifModel class)
+            string make = exif.Make?.ToLowerInvariant() ?? "";
+            string model = exif.Model?.ToLowerInvariant() ?? "";
+
+            // Common mobile manufacturers and indicators
+            return make.Contains("apple") ||
+                   make.Contains("google") ||
+                   make.Contains("samsung") ||
+                   make.Contains("huawei") ||
+                   make.Contains("htc") ||
+                   make.Contains("nokia") ||
+                   make.Contains("qcom-aa") ||
+                   make.Contains("xiaomi") ||
+                   model.Contains("iphone") ||
+                   model.Contains("htc") ||
+                   model.Contains("qcom-aa") ||
+                   model.Contains("android");
+        }
         public void SetCameraValues(RenameViewModel model, ExifModel defaultCamera, ExifModel currentExifModel, ExifModel exifModel)
         {
             // LAYER 1: If box is CHECKED, unconditionally force the UI Screen Dropdown Preset
@@ -375,7 +466,7 @@ namespace MediaArchiver
             foreach (string file in fileNames)
             {
                 string extension = Path.GetExtension(file).ToLower();
-                string[] validExtensions = { ".jpg", ".jpeg", ".png", ".heic", ".mpg", ".mp4", ".mts", ".avi" };
+                string[] validExtensions = { ".jpg", ".jpeg", ".png", ".heic", ".mpg", ".mp4", ".mts", ".avi", ".webp" };
 
                 if (validExtensions.Contains(extension))
                 {
@@ -403,8 +494,14 @@ namespace MediaArchiver
             return null;
         }
 
-        public DateTime AdjustMediaTime(DateTime originalTime, RenameViewModel model)
+        public DateTime AdjustMediaTime(DateTime originalTime, RenameViewModel model, ExifModel currentExifModel)
         {
+            // If it's a mobile phone, bypass the adjustment entirely and return the original time
+            if (currentExifModel?.IsMobile == true)
+            {
+                return originalTime;
+            }
+
             return originalTime
                 .AddYears(model.OffSetYears)
                 .AddMonths(model.OffSetMonths)
@@ -420,14 +517,15 @@ namespace MediaArchiver
             return tz.GetUtcOffset(mediaDate);
         }
 
-        public string DetermineTitle(string currentTitle, string inputTitle, bool forceUpdate, string extension, string year)
+        public string DetermineTitle(string currentTitle, bool forceUpdate, string extension, string year)
         {
             currentTitle = currentTitle?.Trim() ?? "";
-            inputTitle = inputTitle?.Trim() ?? "";
+       
 
             string[] videoExtensions = { ".mpg", ".mp4", ".mts", ".avi", ".mov" };
             string fileType = videoExtensions.Contains(extension.ToLower()) ? "video" : "photo";
 
+            /*
             if (forceUpdate) return inputTitle;
             if (!string.IsNullOrEmpty(currentTitle) && !currentTitle.StartsWith("Archived", StringComparison.OrdinalIgnoreCase)) return currentTitle;
 
@@ -435,6 +533,7 @@ namespace MediaArchiver
             {
                 if (!string.IsNullOrEmpty(inputTitle)) return inputTitle;
             }
+            */
 
             string finalYear = !string.IsNullOrEmpty(year) ? year : DateTime.Now.Year.ToString();
             return $"Archived {fileType} {finalYear}";

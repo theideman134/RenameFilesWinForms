@@ -6,12 +6,19 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Media.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="BenchmarkSuite1\**" />
     <EmbeddedResource Remove="BenchmarkSuite1\**" />
     <None Remove="BenchmarkSuite1\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Media.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -25,6 +32,15 @@
   <ItemGroup>
     <ProjectReference Include="..\exiftool\Exiftools.csproj" />
     <ProjectReference Include="..\PhotoDB\PhotoDB.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Icon1.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Media.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
