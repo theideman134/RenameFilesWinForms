@@ -25,7 +25,8 @@ namespace MediaArchiver
         public bool ForceUpdate { get; set; } = false;
         public bool ForceTitleDescUpdate { get; set; } = false;
         public bool ForceGPSUpdate { get; set; } = false;
-        public bool ForceCameraUpdate { get; set; } = false; 
+        public bool ForceCameraUpdate { get; set; } = false;
+        public bool KeepOrginalFileName { get; set; } = false;
 
 
     }

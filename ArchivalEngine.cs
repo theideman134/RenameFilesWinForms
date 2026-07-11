@@ -8,6 +8,9 @@ using System.IO;
 using System.Linq;
 using System.Reflection.Metadata.Ecma335;
 using System.Text.RegularExpressions;
+using TimeZoneConverter;
+using GeoTimeZone;
+using TimeZoneConverter;
 
 namespace MediaArchiver
 {
@@ -159,6 +162,7 @@ namespace MediaArchiver
             // 1. Set Hardware & GPS standard baselines
             SetCameraValues(model, defaultCamera, currentExifModel, exifModel);
             SetGPS(model, exifModel, currentExifModel);
+            DetermineFinalTimeZone(model,currentExifModel);
 
             currentExifModel.IsMobile = IsMobileDevice(exifModel);
 
@@ -171,7 +175,11 @@ namespace MediaArchiver
 
             // 3. Unique Filename Generation & Conflict Resolution (Natural Keys)
             string newName = "";
-            if(!String.IsNullOrEmpty(model.AltName))
+            if(model.KeepOrginalFileName)
+            {
+                newName = Path.GetFileNameWithoutExtension(fullName);
+            }
+            else if (!String.IsNullOrEmpty(model.AltName))
             {
                 newName = model.AltName.Trim();
             }
@@ -213,6 +221,7 @@ namespace MediaArchiver
 
             // 6. SCENARIO C TRACKING STRING: No text gluing, no UI lookups. Pure immutable technical audit trail.
             string cleanOriginalDateStr = ParseOriginalDateDescription(currentExifModel, originalFileDate);
+
             string tzAbbreviation = GetTimeZoneAbbreviation(model.TimeZone, correctedTime);
 
             if (model.LocationPresets != null && !string.IsNullOrWhiteSpace(model.LocationPresets.LocationCode))
@@ -332,6 +341,26 @@ namespace MediaArchiver
             {
                 return "UTC"; // Failsafe if a strange zone string slips through
             }
+        }
+        public void DetermineFinalTimeZone(RenameViewModel model, ExifModel currentExifModel)
+        {
+            // 1. If GPS exists, use it to automatically find the time zone
+
+            if (currentExifModel.LatitudeText != null && currentExifModel.LongitudeText != null && !model.ForceGPSUpdate)
+            {
+                string ianaZone = GeoTimeZone.TimeZoneLookup.GetTimeZone(Convert.ToDouble(currentExifModel.LatitudeText), Convert.ToDouble(currentExifModel.LongitudeText)).Result;
+                model.TimeZone = TimeZoneConverter.TZConvert.IanaToWindows(ianaZone);
+            }
+            else if (model.LocationPresets != null && model.LocationPresets?.Latitude != 0.0M && model.LocationPresets?.Longitude != 0.0M)
+            {
+                string ianaZone = GeoTimeZone.TimeZoneLookup.GetTimeZone(Convert.ToDouble(model.LocationPresets.Latitude),Convert.ToDouble(model.LocationPresets.Longitude)).Result;
+                model.TimeZone = TimeZoneConverter.TZConvert.IanaToWindows(ianaZone);
+            }
+            else if(string.IsNullOrEmpty(model.TimeZone))
+            {
+                model.TimeZone = "UTC";
+            }
+
         }
 
         private string BuildLocationSuffix(RenameViewModel model)
