@@ -70,6 +70,7 @@
             btnUpdateGPS = new Button();
             txtManualGPS = new TextBox();
             chkKeepOriginal = new CheckBox();
+            chkIgnoreFileName = new CheckBox();
             SuspendLayout();
             // 
             // dirText
@@ -448,11 +449,22 @@
             chkKeepOriginal.Text = "Keep file name";
             chkKeepOriginal.UseVisualStyleBackColor = true;
             // 
+            // chkIgnoreFileName
+            // 
+            chkIgnoreFileName.AutoSize = true;
+            chkIgnoreFileName.Location = new Point(574, 127);
+            chkIgnoreFileName.Name = "chkIgnoreFileName";
+            chkIgnoreFileName.Size = new Size(111, 19);
+            chkIgnoreFileName.TabIndex = 51;
+            chkIgnoreFileName.Text = "Ignore Filename";
+            chkIgnoreFileName.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(720, 586);
+            Controls.Add(chkIgnoreFileName);
             Controls.Add(chkKeepOriginal);
             Controls.Add(txtManualGPS);
             Controls.Add(btnUpdateGPS);
@@ -546,5 +558,6 @@
         private Button btnUpdateGPS;
         private TextBox txtManualGPS;
         private CheckBox chkKeepOriginal;
+        private CheckBox chkIgnoreFileName;
     }
 }

@@ -28,6 +28,6 @@ namespace MediaArchiver
         public bool ForceCameraUpdate { get; set; } = false;
         public bool KeepOrginalFileName { get; set; } = false;
 
-
+        public bool IsIgnoreFilename { get; set; } = false;
     }
 }

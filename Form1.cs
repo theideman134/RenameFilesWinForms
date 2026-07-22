@@ -76,8 +76,9 @@ namespace RenameFilesWinForms
                 LocationPresets = cboLocations.SelectedIndex > 0 ? (LocationPreset?)cboLocations.SelectedItem : null,
                 ForceTitleDescUpdate = chkForceTitleUpdate.Checked,
                 ForceGPSUpdate = chkForceGPS.Checked,
-                ForceCameraUpdate = chkForceCamera.Checked.
-                KeepOrginalFileName = chkKeepOriginal.Checked
+                ForceCameraUpdate = chkForceCamera.Checked,
+                KeepOrginalFileName = chkKeepOriginal.Checked,
+                IsIgnoreFilename = chkIgnoreFileName.Checked
 
             };
 
@@ -141,6 +142,8 @@ namespace RenameFilesWinForms
             cboLocations.SelectedIndex = 0;
             chkKeepOriginal.Checked = false;
             chkKeepOriginal.Update();
+            chkIgnoreFileName.Checked = false;
+            chkIgnoreFileName.Update();
 
         }
 
@@ -270,6 +273,7 @@ namespace RenameFilesWinForms
         private void btnUpdateGPS_Click(object sender, EventArgs e)
         {
             LoadLocationComboBox();
+            LoadCameraComboBox();
         }
 
     }

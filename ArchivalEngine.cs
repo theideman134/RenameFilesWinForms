@@ -58,7 +58,7 @@ namespace MediaArchiver
 
                 // 1. In-memory data retrieval side effects
                 ExifModel currentExifModel = exiftool.GetFileMetadata(fileInfo.FullName) ?? new ExifModel();
-                DateTime originalFileDate = GetDateTaken(fileInfo.FullName, model.UseUTC, out bool hasMetadata);
+                DateTime originalFileDate = GetDateTaken(fileInfo.FullName, model.UseUTC, model.IsIgnoreFilename, out bool hasMetadata);
 
                 // 2. CALL PURE ENGINE: Calculate the blueprint in-memory. 
                 // We pass a delegate function 'File.Exists' so the loop can check duplication without hardcoding disk access!
@@ -526,7 +526,7 @@ namespace MediaArchiver
         public DateTime AdjustMediaTime(DateTime originalTime, RenameViewModel model, ExifModel currentExifModel)
         {
             // If it's a mobile phone, bypass the adjustment entirely and return the original time
-            if (currentExifModel?.IsMobile == true)
+            if (currentExifModel?.IsMobile == true && !model.ForceUpdate)
             {
                 return originalTime;
             }
@@ -587,12 +587,12 @@ namespace MediaArchiver
             return currentModel;
         }
 
-        private static DateTime GetDateTaken(string filePath, bool isTrueUTC, out bool hasMetadata)
+        private static DateTime GetDateTaken(string filePath, bool isTrueUTC, bool IsIgnoreFilename, out bool hasMetadata)
         {
             hasMetadata = false;
             string fileName = Path.GetFileNameWithoutExtension(filePath);
-
-            if (DateTime.TryParseExact(fileName, "yyyyMMdd_HHmmss", null, System.Globalization.DateTimeStyles.AssumeLocal, out DateTime parsedDate))
+            
+            if (!IsIgnoreFilename && DateTime.TryParseExact(fileName, "yyyyMMdd_HHmmss", null, System.Globalization.DateTimeStyles.AssumeLocal, out DateTime parsedDate))
             {
                 hasMetadata = true;
                 return DateTime.SpecifyKind(parsedDate, DateTimeKind.Local);
